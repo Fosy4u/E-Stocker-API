@@ -102,3 +102,9 @@ dist
 
 # TernJS port file
 .tern-port
+
+
+# firebase
+e-stocker-firebase-adminsdk-zm0id-caf6fee4ec.json
+
+appSecrets.json
