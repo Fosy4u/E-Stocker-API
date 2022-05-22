@@ -4,11 +4,6 @@ const timestamp = require("mongoose-timestamp");
 
 const ProductSchema = new mongoose.Schema(
   {
-    // productCode: {
-    //   code: { type: String, required: true },
-    //   expiryDate: { type: String, required: false },
-    //   startExpiryReminderDate: { type: String, required: false },
-    // },
     productCode: { type: String, required: true },
     organisationId: { type: String, required: true },
     name: { type: String, required: true },
@@ -27,10 +22,15 @@ const ProductSchema = new mongoose.Schema(
     type: { type: String, required: true },
     description: { type: String, required: false },
     weight: { type: String, required: false },
-    //  imageUrl: { type: String, required: false },
     imageUrl: {
       link: { type: String, required: false },
       name: { type: String, required: false },
+    },
+
+    productExpiry: {
+      productCode: { type: String, required: false },
+      expiryDate: { type: String, required: false },
+      startExpiryReminderDate: { type: String, required: false },
     },
   },
   { timestamps: true }

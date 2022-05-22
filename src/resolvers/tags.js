@@ -42,9 +42,7 @@ const getTags = async (req, res) => {
     console.log("format : ", format);
     return res.status(200).send(tags);
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 
@@ -113,9 +111,7 @@ const createProductTag = async (req, res) => {
       return res.status(200).send(createdTags);
     }
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 const deleteTagModel = async (productCodes) => {

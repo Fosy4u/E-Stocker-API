@@ -34,7 +34,6 @@ const addImage = async (req, filename) => {
       }
     );
     url = { link: storage[0].metadata.mediaLink, name: filename };
-    console.log("url", url);
     return url;
   }
   return url;
@@ -70,9 +69,7 @@ const getProducts = async (req, res) => {
       return res.status(200).send(finalProducts);
     }
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 const getBulkProductTemplate = async (req, res) => {
@@ -83,14 +80,11 @@ const getBulkProductTemplate = async (req, res) => {
       return res.status(200).send(products);
     }
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 
 const checkExisting = async (productCodes) => {
-  console.log("starting check", productCodes, typeof productCodes);
   const reduce = await productCodes.reduce(async (acc, item) => {
     let exist = await acc;
     const productCode = item;
@@ -102,7 +96,6 @@ const checkExisting = async (productCodes) => {
     return exist;
   }, []);
 
-  console.log("reduce is", reduce);
   return reduce;
 };
 const checkUnusedTag = async (productCodes, organisationId) => {
@@ -137,9 +130,9 @@ const validateProductCode = async (productCodes, organisationId) => {
     return inValid;
   }, []);
 };
-const updateTagStatus = async (productCodes, organisationId, status) => {
-  console.log("codes", productCodes);
-  return productCodes.reduce(async (acc, item) => {
+const updateTagStatus = async (newProducts, organisationId, status) => {
+  console.log("changing status", newProducts);
+  return newProducts.reduce(async (acc, item) => {
     let updatedTags = await acc;
     const productCode = item.productCode;
     const filter = { productCode, organisationId };
@@ -162,18 +155,41 @@ const updateTagStatus = async (productCodes, organisationId, status) => {
     return updatedTags;
   }, []);
 };
-const saveProduct = (productCodes, params) => {
+const addExpiryAndSave = (productExpiryList, productCode) => {
+  console.log("starting expir", productCode);
+  const found = productExpiryList.find(
+    (expiry) => expiry.productCode === productCode
+  );
+  console.log(
+    "🚀 ~ file: product.js ~ line 165 ~ addExpiryAndSave ~ found",
+    found
+  );
+  return found;
+};
+const saveProduct = async (productCodes, productExpiryList, params) => {
   console.log("starting check");
-  return productCodes.reduce(async (acc, item) => {
+  const save = await productCodes.reduce(async (acc, item) => {
     const createdProducts = await acc;
     const productCode = item;
-    const product = new ProductModel({ ...params, productCode });
+    const productExpiry = addExpiryAndSave(productExpiryList, productCode);
+    console.log("productExpiry", productExpiry);
+    const product = new ProductModel({
+      ...params,
+      productCode,
+      productExpiry,
+    });
     const newProduct = await product.save();
-    console.log("saved");
-    createdProducts.push(newProduct);
-
+    if (newProduct) {
+      console.log(
+        "🚀 ~ file: product.js ~ line 193 ~ returnproductCodes.reduce ~ newProduct",
+        newProduct
+      );
+      createdProducts.push(newProduct);
+    }
     return createdProducts;
   }, []);
+  console.log("saveeee", save);
+  return save;
 };
 
 const createProduct = async (req, res) => {
@@ -198,6 +214,7 @@ const createProduct = async (req, res) => {
     description,
     businessLine,
   } = req.body;
+
   const productCodes = JSON.parse(req.body.productCodes);
   const createdProducts = [];
   console.log("prodCode", productCodes);
@@ -255,9 +272,12 @@ const createProduct = async (req, res) => {
       const filename = req.file.filename;
       imageUrl = await addImage(req, filename);
     }
-
+    const productExpiry = req.body.productExpiry
+      ? JSON.parse(req.body.productExpiry)
+      : [];
     const newProducts = await saveProduct(
       productCodes,
+      productExpiry,
       (params = {
         type,
         name,
@@ -279,20 +299,20 @@ const createProduct = async (req, res) => {
         imageUrl: imageUrl || "",
       })
     );
+
     if (newProducts.length > 0) {
-      console.log(newProducts, "new products");
       const status = { status: "in-stock" };
+      console.log("new products :", newProducts);
       const updateProductStatus = await updateTagStatus(
         newProducts,
         organisationId,
         status
       );
+      console.log("updated tag status", updateProductStatus);
       return res.status(200).send(newProducts);
     }
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 const saveBulkProduct = async (products) => {
@@ -313,8 +333,37 @@ const createBulkProduct = async (req, res) => {
     let error = false;
     console.log("starting check");
     req.body.map((product) => {
-      const { name, organisationId, productCode, price, category } = product;
-      if (!name || !productCode || !organisationId || !category || !price) {
+      const {
+        type,
+        name,
+        organisationId,
+        costPrice,
+        sellingPrice,
+        category,
+        unitCostPrice,
+        unitSellingPrice,
+        quantity,
+        brand,
+        branch,
+        manufacturer,
+        weight,
+        businessLine,
+        vat,
+        unit,
+        description,
+        productCode,
+        productExpiry,
+      } = product;
+      if (!name || !productCode || !organisationId || !category) {
+        error = true;
+      }
+      if (
+        (type === "Single Product" && !sellingPrice) ||
+        (type === "Single Product" && !costPrice) ||
+        (type === "Collective Product" && !unitSellingPrice) ||
+        (type === "Collective Product" && !unitCostPrice) ||
+        (type === "Collective Product" && !quantity)
+      ) {
         error = true;
       }
     });
@@ -367,9 +416,7 @@ const createBulkProduct = async (req, res) => {
       return res.status(200).send(createBulkProduct);
     }
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 const downloadProductTemplate = async (req, res) => {
@@ -398,9 +445,7 @@ const downloadProductTemplate = async (req, res) => {
       return res.end();
     });
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 
@@ -508,9 +553,7 @@ const deleteProduct = async (req, res) => {
     console.log("deleted products successful");
     return res.status(200).send(ids);
   } catch (error) {
-    return res.status(500).send({
-      message: error.message,
-    });
+    return res.status(500).send(error.message);
   }
 };
 const editProduct = async (req, res) => {
