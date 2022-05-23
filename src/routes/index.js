@@ -12,6 +12,7 @@ const uploadImage = require("../middleware/uploadImage");
 let routes = (app) => {
   router.get("/", homeResolver.getHome);
   router.get("/products", productsResolver.getProducts);
+  router.get("/product", productsResolver.getOneProduct);
   router.post("/product/create",uploadImage, productsResolver.createProduct);
   router.post("/product/createBulkProduct", productsResolver.createBulkProduct);
   router.delete("/product/deleteProduct", productsResolver.deleteProduct);

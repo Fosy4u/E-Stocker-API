@@ -39,7 +39,7 @@ const addImage = async (req, filename) => {
   return url;
 };
 
-const getProductStatus = async (data, organisationId) => {
+const getProductStatusAndExpiry = async (data, organisationId) => {
   return data.reduce(async (acc, item) => {
     const newItem = { ...item };
     let products = await acc;
@@ -49,6 +49,9 @@ const getProductStatus = async (data, organisationId) => {
     });
     if (found) {
       newItem._doc.status = found[0].status;
+      newItem._doc.expiryDate = item.productExpiry.expiryDate || "";
+      newItem._doc.startExpiryReminderDate =
+        item.productExpiry.startExpiryReminderDate || "";
     }
     products.push(newItem._doc);
 
@@ -61,7 +64,10 @@ const getProducts = async (req, res) => {
     const organisationId = req.query.organisationId;
     const products = await ProductModel.find({ organisationId });
     if (products) {
-      const finalProducts = await getProductStatus(products, organisationId);
+      const finalProducts = await getProductStatusAndExpiry(
+        products,
+        organisationId
+      );
       if (finalProducts) {
         return res.status(200).send(finalProducts);
       }
@@ -72,6 +78,27 @@ const getProducts = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+
+const getOneProduct = async (req, res) => {
+  try {
+    const { organisationId, _id } = req.query;
+    const products = await ProductModel.find({ organisationId, _id });
+    if (products) {
+      const finalProducts = await getProductStatusAndExpiry(
+        products,
+        organisationId
+      );
+      if (finalProducts) {
+        return res.status(200).send(finalProducts);
+      }
+
+      return res.status(200).send(finalProducts);
+    }
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
 const getBulkProductTemplate = async (req, res) => {
   try {
     const products = await ProductModel.find({});
@@ -118,6 +145,7 @@ const checkUnusedTag = async (productCodes, organisationId) => {
   return reduce;
 };
 const validateProductCode = async (productCodes, organisationId) => {
+  console.log("validate product code ", organisationId);
   return productCodes.reduce(async (acc, item) => {
     let inValid = await acc;
     const productCode = item;
@@ -331,7 +359,7 @@ const createBulkProduct = async (req, res) => {
   try {
     let productCodes = [];
     let error = false;
-    console.log("starting check");
+
     req.body.map((product) => {
       const {
         type,
@@ -354,6 +382,7 @@ const createBulkProduct = async (req, res) => {
         productCode,
         productExpiry,
       } = product;
+      console.log("passed here entrance ", organisationId);
       if (!name || !productCode || !organisationId || !category) {
         error = true;
       }
@@ -374,10 +403,10 @@ const createBulkProduct = async (req, res) => {
           `error - incomplete data , please check the imported file and ensure it complies with our template. You can contact us for help`
         );
     }
+
     req.body.map((product) => {
       productCodes.push(product.productCode);
     });
-
     const duplicateProducts = await checkExisting(productCodes);
     if (duplicateProducts.length > 0) {
       console.log("found", duplicateProducts);
@@ -391,7 +420,11 @@ const createBulkProduct = async (req, res) => {
           } from store and redo this request. Product Code : [${duplicateProducts}]`
         );
     }
-    const check = await validateProductCode(productCodes, organisationId);
+
+    const check = await validateProductCode(
+      productCodes,
+      req.body[0].organisationId
+    );
     console.log("invalid isss", check);
     if (check?.length > 0) {
       return res
@@ -404,13 +437,14 @@ const createBulkProduct = async (req, res) => {
           } has been generated already before this action.  Product Code : [${check}]`
         );
     }
+
     const createBulkProduct = await saveBulkProduct(req.body);
     if (createBulkProduct.length > 0) {
       console.log(createBulkProduct, "new products");
       const status = { status: "in-stock" };
       const updateProductStatus = await updateTagStatus(
         createBulkProduct,
-        organisationId,
+        req.body[0].organisationId,
         status
       );
       return res.status(200).send(createBulkProduct);
@@ -557,20 +591,28 @@ const deleteProduct = async (req, res) => {
   }
 };
 const editProduct = async (req, res) => {
-  const { id, name, category, price } = req.body;
-  const update = await ProductModel.findByIdAndUpdate(
-    id,
-    { name, category, price },
-    { new: true }
-  );
-  if (update) {
-    console.log("update", update);
-    return res.status(200).send(update);
+  try {
+    console.log("starting edit", req.body);
+    // const { id, name, category, price } = req.body;
+    const { _id } = req.body;
+    const update = await ProductModel.findByIdAndUpdate(
+      _id,
+      // { name, category, price },
+      { ...req.body },
+      { new: true }
+    );
+    if (update) {
+      console.log("update", update);
+      return res.status(200).send(update);
+    }
+  } catch (error) {
+    return res.status(500).send(error.message);
   }
 };
 
 module.exports = {
   getProducts,
+  getOneProduct,
   createProduct,
   createBulkProduct,
   downloadProductTemplate,
