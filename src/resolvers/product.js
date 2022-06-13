@@ -6,8 +6,8 @@ const mongoose = require("mongoose");
 var fs = require("fs");
 const console = require("console");
 const ImageModel = require("../models/images");
-
-const storageRef = require("../config/firebase"); // reference to our db
+const DeletedProductModel = require("../models/deletedProducts");
+const { storageRef } = require("../config/firebase"); // reference to our db
 const root = require("../../root");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
@@ -93,6 +93,20 @@ const getOneProduct = async (req, res) => {
       }
 
       return res.status(200).send(finalProducts);
+    }
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
+const getGallery = async (req, res) => {
+  try {
+    const organisationId = req.query.organisationId;
+    const gallery = await ProductModel.find({ organisationId }).select(
+      "imageUrl"
+    );
+    if (gallery) {
+      return res.status(200).send(gallery);
     }
   } catch (error) {
     return res.status(500).send(error.message);
@@ -194,7 +208,7 @@ const addExpiryAndSave = (productExpiryList, productCode) => {
   );
   return found;
 };
-const saveProduct = async (productCodes, productExpiryList, params) => {
+const saveProduct = async (productCodes, log, productExpiryList, params) => {
   console.log("starting check");
   const save = await productCodes.reduce(async (acc, item) => {
     const createdProducts = await acc;
@@ -208,6 +222,12 @@ const saveProduct = async (productCodes, productExpiryList, params) => {
     });
     const newProduct = await product.save();
     if (newProduct) {
+      const updateLog = await ProductModel.findByIdAndUpdate(
+        newProduct._id,
+        // { name, category, price },
+        { $push: { logs: log } },
+        { new: true }
+      );
       console.log(
         "🚀 ~ file: product.js ~ line 193 ~ returnproductCodes.reduce ~ newProduct",
         newProduct
@@ -303,8 +323,10 @@ const createProduct = async (req, res) => {
     const productExpiry = req.body.productExpiry
       ? JSON.parse(req.body.productExpiry)
       : [];
+    const log = req.body.log && JSON.parse(req.body.log);
     const newProducts = await saveProduct(
       productCodes,
+      log,
       productExpiry,
       (params = {
         type,
@@ -349,6 +371,14 @@ const saveBulkProduct = async (products) => {
     const product = new ProductModel(item);
     console.log("item", item);
     const newProduct = await product.save();
+    if (newProduct) {
+      const updateLog = await ProductModel.findByIdAndUpdate(
+        newProduct._id,
+        // { name, category, price },
+        { $push: { logs: item.log } },
+        { new: true }
+      );
+    }
     console.log("saved");
     createdProducts.push(newProduct);
 
@@ -381,6 +411,7 @@ const createBulkProduct = async (req, res) => {
         description,
         productCode,
         productExpiry,
+        log,
       } = product;
       console.log("passed here entrance ", organisationId);
       if (!name || !productCode || !organisationId || !category) {
@@ -500,16 +531,26 @@ const validateProduct = async (ids) => {
   return invalidProducts;
 };
 
-const deleteProductModel = async (ids) => {
+const deleteProductModel = async (ids, reason, deletedBy) => {
   console.log("starting del");
-  return ids.reduce(async (acc, id) => {
+  return ids.reduce(async (acc, _id) => {
     const result = await acc;
-    const deleted = await ProductModel.findByIdAndRemove(id);
+    const existingProduct = await ProductModel.findById(_id);
+    const deleted = await ProductModel.findByIdAndRemove(_id);
     // const delteImage = await storageRef
     //   .file("/uploads/e-stocker/" + "2022-05-14T22-48-59.812Z-IMG_E9128.JPG")
     //   .delete();
     // console.log("del is", deleted);
-    console.log("id", id);
+    console.log("id", _id);
+    const deletedProduct = { ...existingProduct._doc };
+    console.log("deleted prod", deletedProduct);
+    if (deletedProduct) {
+      delete deletedProduct._id;
+      deletedProduct.reason = reason;
+      deletedProduct.deletedBy = deletedBy;
+      const newDeletedproduct = new DeletedProductModel(deletedProduct);
+      const saveDeletedProduct = await newDeletedproduct.save();
+    }
     if (deleted?.length === 0) {
       result.push(deleted[0]);
     }
@@ -550,7 +591,8 @@ const deleteProductImageFirebase = async (images) => {
 };
 
 const deleteProduct = async (req, res) => {
-  const { ids, productCode, organisationId, images } = req.body;
+  const { ids, productCode, organisationId, images, reason, deletedBy } =
+    req.body;
   try {
     const invalidProducts = await validateProduct(ids);
     if (invalidProducts.length > 0) {
@@ -563,7 +605,8 @@ const deleteProduct = async (req, res) => {
           } not exist. Please contact FosyTech support if this error persist unexpectedly : [${invalidProducts}]`
         );
     }
-    const deletedProduct = await deleteProductModel(ids);
+
+    const deletedProduct = await deleteProductModel(ids, reason, deletedBy);
     const deleteImage = await deleteProductImageFirebase(images);
     if (deletedProduct.length > 0) {
       console.log("failed deleted tags", usedTags);
@@ -573,7 +616,7 @@ const deleteProduct = async (req, res) => {
           `request failed. Please ensure you have good internet. if error persists, contact FosyTech`
         );
     }
-    const status = { status: "product-deleted" };
+    const status = { status: "deleted" };
     const productCodes = [
       {
         productCode,
@@ -593,17 +636,107 @@ const deleteProduct = async (req, res) => {
 const editProduct = async (req, res) => {
   try {
     console.log("starting edit", req.body);
-    // const { id, name, category, price } = req.body;
-    const { _id } = req.body;
-    const update = await ProductModel.findByIdAndUpdate(
-      _id,
-      // { name, category, price },
-      { ...req.body },
-      { new: true }
-    );
-    if (update) {
-      console.log("update", update);
-      return res.status(200).send(update);
+
+    if (!req.body.imageUrl && req.file) {
+      const { _id } = req.body;
+      const filename = req.file.filename;
+      const imageUrl = await addImage(req, filename);
+      const update = await ProductModel.findByIdAndUpdate(
+        _id,
+        // { name, category, price },
+        { ...req.body, imageUrl },
+        { new: true }
+      );
+      if (update) {
+        const log = req.body.log && JSON.parse(req.body.log);
+        const updateLog = await ProductModel.findByIdAndUpdate(
+          update._id,
+          // { name, category, price },
+          { $push: { logs: log } },
+          { new: true }
+        );
+
+        return res.status(200).send(update);
+      }
+    } else {
+      const { _id, log } = req.body;
+      const update = await ProductModel.findByIdAndUpdate(
+        _id,
+        // { name, category, price },
+        { ...req.body },
+        { new: true }
+      );
+      if (update) {
+        const updateLog = await ProductModel.findByIdAndUpdate(
+          update._id,
+          // { name, category, price },
+          { $push: { logs: log } },
+          { new: true }
+        );
+        console.log("update", update);
+        return res.status(200).send(update);
+      }
+    }
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const cloneProduct = async (req, res) => {
+  try {
+    console.log("starting clone", req.body);
+    const { _id, productCode, organisationId, log } = req.body;
+    const check = await validateProductCode([productCode], organisationId);
+    console.log("invalid isss", check);
+    if (check?.length > 0) {
+      return res
+        .status(400)
+        .send(
+          `request failed as the following product ${
+            duplicateProducts.length > 1 ? "codes are" : "code is"
+          }  invalid. Please ensure the product ${
+            duplicateProducts.length > 1 ? "codes" : "code"
+          } has been generated already before this action.  Product Code : [${check}]`
+        );
+    }
+    const invalidTags = await checkUnusedTag([productCode], organisationId);
+    if (invalidTags.length > 0) {
+      console.log("found", invalidTags);
+      return res.status(400).send(
+        `request failed as the following product ${
+          duplicateProducts.length > 1 ? "codes have" : "code has"
+        }  been used before by another existing or previously deleted product. 
+           Product Code : [${invalidTags}]`
+      );
+    }
+    if (_id && productCode) {
+      const existingProduct = await ProductModel.findById(_id);
+      const clonedProduct = { ...existingProduct._doc };
+      console.log("cloned prod", clonedProduct);
+      if (clonedProduct) {
+        delete clonedProduct._id;
+        delete clonedProduct.logs;
+        clonedProduct.productCode = productCode;
+
+        const product = new ProductModel(clonedProduct);
+        const newProduct = await product.save();
+        if (newProduct) {
+          const update = await ProductModel.findByIdAndUpdate(
+            newProduct._id,
+            // { name, category, price },
+            { $push: { logs: log } },
+            { new: true }
+          );
+
+          const status = { status: "in-stock" };
+          const updateProductStatus = await updateTagStatus(
+            [newProduct],
+            organisationId,
+            status
+          );
+          console.log("updated tag status", updateProductStatus);
+          return res.status(200).send(newProduct);
+        }
+      }
     }
   } catch (error) {
     return res.status(500).send(error.message);
@@ -613,9 +746,11 @@ const editProduct = async (req, res) => {
 module.exports = {
   getProducts,
   getOneProduct,
+  getGallery,
   createProduct,
   createBulkProduct,
   downloadProductTemplate,
   deleteProduct,
   editProduct,
+  cloneProduct,
 };

@@ -7,6 +7,7 @@ const dbConfig = require("../src/config/db");
 const { ServerApiVersion } = require("mongodb");
 
 
+
 const url = dbConfig.url;
 const app = express();
 
@@ -22,7 +23,6 @@ var corsOptions = {
 };
 app.use(cors(corsOptions));
 
-//app.use("/file", upload);
 
 const start = async () => {
   try {

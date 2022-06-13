@@ -3,11 +3,13 @@ const mongoose = require("mongoose");
 const timestamp = require("mongoose-timestamp");
 //const mongooseLogs = require('mongoose-activitylogs');
 
-const ProductSchema = new mongoose.Schema(
+const DeletedProductSchema = new mongoose.Schema(
   {
     productCode: { type: String, required: true },
     organisationId: { type: String, required: true },
     name: { type: String, required: true },
+    reason: { type: String, required: true },
+    deletedBy: { type: String, required: true },
     category: { type: String, required: true },
     costPrice: { type: Number, required: false },
     sellingPrice: { type: Number, required: false },
@@ -27,22 +29,21 @@ const ProductSchema = new mongoose.Schema(
       link: { type: String, required: false },
       name: { type: String, required: false },
     },
-   logs:[{date: Date, user: String, details: String}],
+    logs: [{ date: Date, user: String, details: String }],
     productExpiry: {
       productCode: { type: String, required: false },
       expiryDate: { type: String, required: false },
       startExpiryReminderDate: { type: String, required: false },
     },
   },
+
   { timestamps: true }
 );
-// ProductSchema.plugin(mongooseLogs, {
-//   schemaName: "productSchema",
-//   createAction: "posted",
-//   updateAction: "updated",
-//   deleteAction: "removed" 
-// })
 
-const ProductModel = mongoose.model("products", ProductSchema, "products");
+const DeletedProductModel = mongoose.model(
+  "deletedProducts",
+  DeletedProductSchema,
+  "deletedProducts"
+);
 
-module.exports = ProductModel;
+module.exports = DeletedProductModel;

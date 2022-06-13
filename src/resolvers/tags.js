@@ -30,7 +30,7 @@ const getTags = async (req, res) => {
   try {
     const params = { organisationId };
     console.log("orgId", organisationId);
-    const tags = await TagModel.find({ params });
+    const tags = await TagModel.find(params);
 
     if (tags && format === "true") {
       console.log("format is  ", format);
