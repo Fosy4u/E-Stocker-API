@@ -222,9 +222,11 @@ const saveProduct = async (productCodes, log, productExpiryList, params) => {
     });
     const newProduct = await product.save();
     if (newProduct) {
+      log.action = "created";
       const updateLog = await ProductModel.findByIdAndUpdate(
         newProduct._id,
         // { name, category, price },
+
         { $push: { logs: log } },
         { new: true }
       );
@@ -372,9 +374,11 @@ const saveBulkProduct = async (products) => {
     console.log("item", item);
     const newProduct = await product.save();
     if (newProduct) {
+      log.action = "created";
       const updateLog = await ProductModel.findByIdAndUpdate(
         newProduct._id,
         // { name, category, price },
+
         { $push: { logs: item.log } },
         { new: true }
       );
@@ -641,6 +645,7 @@ const editProduct = async (req, res) => {
       const { _id } = req.body;
       const filename = req.file.filename;
       const imageUrl = await addImage(req, filename);
+
       const update = await ProductModel.findByIdAndUpdate(
         _id,
         // { name, category, price },
@@ -649,9 +654,11 @@ const editProduct = async (req, res) => {
       );
       if (update) {
         const log = req.body.log && JSON.parse(req.body.log);
+        log.action = "edit";
         const updateLog = await ProductModel.findByIdAndUpdate(
           update._id,
           // { name, category, price },
+
           { $push: { logs: log } },
           { new: true }
         );
@@ -667,6 +674,7 @@ const editProduct = async (req, res) => {
         { new: true }
       );
       if (update) {
+        log.action = "edit";
         const updateLog = await ProductModel.findByIdAndUpdate(
           update._id,
           // { name, category, price },
@@ -719,6 +727,7 @@ const cloneProduct = async (req, res) => {
 
         const product = new ProductModel(clonedProduct);
         const newProduct = await product.save();
+        log.action = "create";
         if (newProduct) {
           const update = await ProductModel.findByIdAndUpdate(
             newProduct._id,

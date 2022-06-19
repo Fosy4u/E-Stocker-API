@@ -27,7 +27,15 @@ const ProductSchema = new mongoose.Schema(
       link: { type: String, required: false },
       name: { type: String, required: false },
     },
-   logs:[{date: Date, user: String, details: String}],
+    logs: [
+      {
+        date: Date,
+        user: String,
+        userId: String,
+        action: String,
+        details: String,
+      },
+    ],
     productExpiry: {
       productCode: { type: String, required: false },
       expiryDate: { type: String, required: false },
@@ -36,12 +44,6 @@ const ProductSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
-// ProductSchema.plugin(mongooseLogs, {
-//   schemaName: "productSchema",
-//   createAction: "posted",
-//   updateAction: "updated",
-//   deleteAction: "removed" 
-// })
 
 const ProductModel = mongoose.model("products", ProductSchema, "products");
 

@@ -12,6 +12,10 @@ const OrganisationUserSchema = new mongoose.Schema({
   hierarchyLevel: { type: String, required: false },
   isAdmin: { type: Boolean, required: true, default: false },
   email: { type: String, required: false },
+  imageUrl: {
+    link: { type: String, required: false },
+    name: { type: String, required: false },
+  },
 });
 
 OrganisationUserSchema.plugin(timestamp);
