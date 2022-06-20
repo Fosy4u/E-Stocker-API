@@ -51,7 +51,7 @@ const OrganisationProfileSchema = new mongoose.Schema({
       "product on fire",
       "product written off",
       "damaged product",
-      'inventory re-evaluation'
+      'stock re-evaluation'
     ],
   },
 });

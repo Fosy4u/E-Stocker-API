@@ -4,6 +4,7 @@ const homeResolver = require("../resolvers/home");
 const uploadController = require("../resolvers/upload");
 const pictureController = require("../resolvers/uploadImages");
 const productsResolver = require("../resolvers/product");
+const deletedProductsResolver = require("../resolvers/deletedProducts");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const tagsResolver = require("../resolvers/tags");
@@ -70,6 +71,13 @@ let routes = (app) => {
     authMiddleware,
     productsResolver.downloadProductTemplate
   );
+
+  router.get(
+    "/deletedProducts",
+    authMiddleware,
+    deletedProductsResolver.getProducts
+  );
+
   router.get("/tags", authMiddleware, tagsResolver.getTags);
   router.post("/tags/create", authMiddleware, tagsResolver.createProductTag);
   router.delete("/tags/delete", authMiddleware, tagsResolver.deleteTag);
