@@ -40,7 +40,6 @@ const getOrganisationProfile = async (req, res) => {
     const organisation = await OrganisationProfileModel.find(params);
 
     if (organisation) {
-      console.log(" org found", organisation);
       return res.status(200).send(organisation);
     }
   } catch (error) {
@@ -53,7 +52,6 @@ const createOrganisationProfile = async (req, res) => {
     const organisation = new OrganisationProfileModel({ ...req.body });
     const newOrganisation = await organisation.save();
     if (newOrganisation) {
-      console.log("new org successful", newOrganisation);
       const params = {
         firstName,
         lastName,
@@ -76,8 +74,6 @@ const createOrganisationProfile = async (req, res) => {
 
 const deleteOrganisationProfileDeletionReason = async (req, res) => {
   try {
-    console.log("starting edit", req.body);
-
     const { _id, element } = req.body;
     if (!_id)
       return res.status(400).send({ error: " - no organisation to update" });
@@ -95,7 +91,7 @@ const deleteOrganisationProfileDeletionReason = async (req, res) => {
     );
     if (!deleteReason)
       return res.status(400).send({ message: "organisation not updated" });
-    console.log("update", deleteReason);
+
     return res
       .status(200)
       .send({ message: "organisation updated", data: deleteReason });

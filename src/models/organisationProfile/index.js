@@ -12,17 +12,29 @@ const SocialSchema = new mongoose.Schema({
 });
 const RegionalSettings = new mongoose.Schema({
   language: String,
-  currency: String,
+  currency: { type: String, default: "₦" },
   timeZone: {
-    label: { type: String, required: false },
-    name: { type: String, required: false },
-    tzCode: { type: String, required: false },
-    utc: { type: String, required: false },
+    label: {
+      type: String,
+      required: false,
+      default: "Africa/Lagos (GMT+01:00)",
+    },
+    name: {
+      type: String,
+      required: false,
+      default: "GMT+01:00) Lagos, Kano, Ibadan, Kaduna, Port Harcourt",
+    },
+    tzCode: { type: String, required: false, default: "Africa/Lagos" },
+    utc: { type: String, required: false, default: "+01:00" },
   },
   inventoryStartDate: String,
   fiscalYear: {
-    fiscalYearDay: { type: String, required: false },
-    fiscalYearMonth: { type: String, required: false },
+    fiscalYearDay: { type: String, required: false, default: "1" },
+    fiscalYearMonth: {
+      type: String,
+      required: false,
+      default: "January - December",
+    },
   },
 });
 
@@ -51,7 +63,7 @@ const OrganisationProfileSchema = new mongoose.Schema({
       "product on fire",
       "product written off",
       "damaged product",
-      'stock re-evaluation'
+      "stock re-evaluation",
     ],
   },
 });
