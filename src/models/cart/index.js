@@ -8,7 +8,7 @@ const CartSchema = new mongoose.Schema(
     cart: { type: String },
     priceList: { type: String },
     cartList: { type: String },
-    customerId: { type: String },
+    customer: { type: String },
     organisationId: { type: String, required: true },
     products: { type: String, required: true },
     status: { type: String, required: true },

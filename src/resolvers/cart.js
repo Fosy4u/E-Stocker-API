@@ -23,7 +23,8 @@ const getCart = async (req, res) => {
 
 const deleteCart = async (req, res) => {
   try {
-    const cart = await CartModel.findByIdAndDelete(req.params.id);
+    console.log('start', req.body)
+    const cart = await CartModel.findByIdAndDelete(req.body._id);
     if (cart) {
       return res.status(200).send(cart);
     }

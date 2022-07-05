@@ -2,7 +2,7 @@ const OrganisationProfileModel = require("../models/organisationProfile");
 const OrganisationUserModel = require("../models/organisationUsers");
 
 const createOrganisationUsers = async (req, res) => {
-  const { email, firstName, lastName, password } = req.body;
+  const { email, firstName, lastName, password, organisationId } = req.body;
   try {
     const user = OrganisationUserModel.find({ email });
     if (user) {
@@ -15,8 +15,8 @@ const createOrganisationUsers = async (req, res) => {
       firstName,
       lastName,
       password,
-      organisationId: newOrganisation._id,
-      isAdmin: true,
+      organisationId,
+      isAdmin: false,
     };
     const createUser = new OrganisationUserModel({ ...params });
     const newUser = createUser.save();

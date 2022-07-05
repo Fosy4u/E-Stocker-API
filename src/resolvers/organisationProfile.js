@@ -57,6 +57,7 @@ const createOrganisationProfile = async (req, res) => {
         lastName,
         password,
         userId,
+        root: true,
         organisationId: newOrganisation._id,
         isAdmin: true,
       };

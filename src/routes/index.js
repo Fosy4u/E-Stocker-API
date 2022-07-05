@@ -8,6 +8,7 @@ const deletedProductsResolver = require("../resolvers/deletedProducts");
 const cartResolver = require("../resolvers/cart");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
+const organisationContactResolver = require("../resolvers/organisationContact");
 const tagsResolver = require("../resolvers/tags");
 const firbaseResolver = require("../resolvers/firebaseImageUpload");
 const uploadImage = require("../middleware/uploadImage");
@@ -16,6 +17,7 @@ const authMiddleware = require("../middleware/firebaseUserAuth");
 let routes = (app) => {
   router.get("/", homeResolver.getHome);
 
+  //OgranisationProfile
   router.post(
     "/organisationProfile/create",
     organisationProfileResolver.createOrganisationProfile
@@ -89,7 +91,6 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
   router.post("/tags/create", authMiddleware, tagsResolver.createProductTag);
   router.delete("/tags/delete", authMiddleware, tagsResolver.deleteTag);
 
-  // router.post("/upload", uploadController.uploadFiles);
   router.get(
     "/products/template",
     authMiddleware,
@@ -97,31 +98,36 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
   );
   router.get("/download", authMiddleware, uploadController.download);
 
-  // router.post("/upload", uploadImage.single("file"), async (req, res) => {
-  //   try {
-  //     console.log("received");
-  //     if (req.file === undefined) {
-  //       return res.status(400).send({ message: "You must select a file." });
-  //     }
-  //     // await upload(req, res);
-  //     // console.log(req.file);
 
-  //     return res.status(200).send({
-  //       message: "File has been uploaded.",
-  //     });
-  //   } catch (error) {
-  //     console.log(error);
 
-  //     if (error.code === "LIMIT_UNEXPECTED_FILE") {
-  //       return res.status(400).send({
-  //         message: "Too many files to upload.",
-  //       });
-  //     }
-  //     return res.status(500).send({
-  //       message: `Error when trying upload file: ${error}`,
-  //     });
-  //   }
-  // });
+
+  //OrganisationContact
+  router.post(
+    "/organisationContact/create",
+    authMiddleware,
+    organisationContactResolver.createOrganisationContact
+  );
+  router.get(
+    "/organisationContacts",
+    authMiddleware,
+    organisationContactResolver.getAllOrganisationContacts
+  );
+  router.put(
+    "/organisationContact/editContact",
+    authMiddleware,
+    organisationContactResolver.editOrganisationContact
+    
+  );
+  router.put(
+    "/organisationContact/deleteContact",
+    authMiddleware,
+   organisationContactResolver.deleteOrganisationContact
+  );
+  router.put(
+    "/organisationContact/restoreContact",
+    authMiddleware,
+   organisationContactResolver.restoreOrganisationContact
+  );
 
   return app.use("/", router);
 };
