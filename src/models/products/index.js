@@ -3,6 +3,22 @@ const mongoose = require("mongoose");
 const timestamp = require("mongoose-timestamp");
 //const mongooseLogs = require('mongoose-activitylogs');
 
+const SaleDetailsSchema = new mongoose.Schema(
+  {
+    vat: { type: Boolean, required: false },
+    discount: { type: Number, required: false },
+    finalPrice: { type: Number, required: true },
+    quantity: { type: Number, required: true },
+    productId: { type: String, required: true },
+    name: { type: String, required: true },
+    productCode: { type: String, required: true },
+    saleRemark: { type: String, required: false },
+    imageUrl: { type: String, required: false },
+    sale_Id: { type: String, required: true },
+  },
+  { _id: false }
+);
+
 const ProductSchema = new mongoose.Schema(
   {
     productCode: { type: String, required: true },
@@ -41,6 +57,7 @@ const ProductSchema = new mongoose.Schema(
       expiryDate: { type: String, required: false },
       startExpiryReminderDate: { type: String, required: false },
     },
+    saleDetails: { type: Map, of: SaleDetailsSchema, required: false },
   },
   { timestamps: true }
 );

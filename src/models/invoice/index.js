@@ -1,0 +1,69 @@
+"use strict";
+const mongoose = require("mongoose");
+const timestamp = require("mongoose-timestamp");
+//const mongooseLogs = require('mongoose-activitylogs');
+
+const SummarySchema = new mongoose.Schema(
+  {
+    vat: { type: Boolean, required: false },
+    discount: { type: Number, required: false },
+    finalPrice: { type: Number, required: true },
+    quantity: { type: Number, required: true },
+    productId: { type: String, required: true },
+    name: { type: String, required: true },
+    productCode: { type: String, required: true },
+    salesRemark: { type: String, required: false },
+  },
+  { _id: false }
+);
+
+const InvoiceSchema = new mongoose.Schema(
+  {
+    customerId: { type: String, required: true },
+    summary: { type: Map, of: SummarySchema, required: true },
+    currency: { type: String },
+    organisation: {
+      name: { type: String, required: true },
+      imageUrl: {
+        link: { type: String, required: false },
+        name: { type: String, required: false },
+      },
+    },
+    organisationId: { type: String, required: true },
+    invoiceNo: { type: Number, required: true },
+    paymentMethod: { type: String, value: "invoice" },
+    invoiceDate: { type: String, required: true },
+    dueDate: { type: String, required: true },
+    branch: {
+      name: { type: String, required: false },
+      address: { type: String, required: false },
+      email: { type: String, required: false },
+      phoneNo: { type: String, required: false },
+      branchId: { type: String, required: true },
+    },
+    bankDetails: {
+      bankName: { type: String, required: false },
+      address: { type: String, required: false },
+      accountName: { type: String, required: false },
+      accountNo: { type: String, required: false },
+    },
+    customerNote: { type: String },
+    status: { type: String, required: true },
+    customerDetail: {
+      firstName: { type: String, required: false },
+      lastName: { type: String, required: false },
+      email: { type: String, required: false },
+      phoneNumber: { type: String, required: false },
+      address: { type: String, required: false },
+      salutation: { type: String, required: false },
+    },
+
+    salesPerson: { type: String, required: true },
+  },
+
+  { timestamps: true }
+);
+
+const InvoiceModel = mongoose.model("invoice", InvoiceSchema, "invoice");
+
+module.exports = InvoiceModel;

@@ -6,6 +6,7 @@ const pictureController = require("../resolvers/uploadImages");
 const productsResolver = require("../resolvers/product");
 const deletedProductsResolver = require("../resolvers/deletedProducts");
 const cartResolver = require("../resolvers/cart");
+const saleResolver = require("../resolvers/sales");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const organisationContactResolver = require("../resolvers/organisationContact");
@@ -85,6 +86,15 @@ let routes = (app) => {
 router.get("/cart", authMiddleware, cartResolver.getCart);
 router.post("/cart/create", authMiddleware, cartResolver.createCart);
 router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
+
+
+
+  router.get("/sales", authMiddleware, saleResolver.getAllSales);
+  router.get("/sale", authMiddleware, saleResolver.getSale);
+  router.post("/sale/create", authMiddleware, saleResolver.createSale);
+  router.delete("/sale/delete", authMiddleware, saleResolver.deleteSale);
+  router.put("/sale/edit", authMiddleware, saleResolver.editSale);
+
 
 
   router.get("/tags", authMiddleware, tagsResolver.getTags);

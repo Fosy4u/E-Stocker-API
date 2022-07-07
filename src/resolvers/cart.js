@@ -2,6 +2,9 @@ const CartModel = require("../models/cart");
 
 const createCart = async (req, res) => {
   try {
+    const organisationId = req.body.organisationId;
+    if (!organisationId)
+      return res.status(400).send({ message: "organisationId is required" });
     const cart = await CartModel.create(req.body);
     if (cart) {
       return res.status(200).send(cart);

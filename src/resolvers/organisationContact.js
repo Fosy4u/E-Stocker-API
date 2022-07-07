@@ -1,8 +1,10 @@
 const OrganisationContactModel = require("../models/organisationContact");
 
 const createOrganisationContact = async (req, res) => {
-  const { email } = req.body;
+  const { email, organisationId } = req.body;
   try {
+    if (!email) return res.status(400).send({ message: "email is required" });
+   if(!organisationId) return res.status(400).send({ message: "organisationId is required" });
     console.log("email", email);
     const contact = await OrganisationContactModel.find({ email });
     console.log("contact", contact);
@@ -38,6 +40,7 @@ const createOrganisationContact = async (req, res) => {
 const getOrganisationContact = async (req, res) => {
   try {
     const { _id } = req.query;
+    if (!_id) return res.status(400).send({ message: "contact_id is required" });
     const contact = await OrganisationContactModel.findById({ _id });
     if (!contact) return res.status(400).send({ message: "contact not found" });
     return res.status(200).send({ message: "contact", contact: contact });
@@ -82,6 +85,7 @@ const editOrganisationContact = async (req, res) => {
     console.log("starting edit", req.body);
 
     const { _id } = req.body;
+    if(!_id) return res.status(400).send({ message: "contact_id is required" });
     const update = await OrganisationContactModel.findByIdAndUpdate(
       _id,
       { ...req.body },
