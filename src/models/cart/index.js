@@ -13,6 +13,8 @@ const CartSchema = new mongoose.Schema(
     products: { type: String, required: true },
     status: { type: String, required: true },
     user: { type: String, required: true },
+    branch: { type: String, required: true },
+
   },
 
   { timestamps: true }

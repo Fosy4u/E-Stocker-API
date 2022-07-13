@@ -41,6 +41,7 @@ const RegionalSettings = new mongoose.Schema({
 const OrganisationProfileSchema = new mongoose.Schema({
   name: { type: String, required: true },
   industry: { type: String, required: false },
+  branchId: { type: String, required: false },
   tradingName: { type: String, required: false },
   companyRegNo: { type: String, required: false },
   websiteURL: { type: String, required: false },

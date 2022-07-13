@@ -7,9 +7,11 @@ const productsResolver = require("../resolvers/product");
 const deletedProductsResolver = require("../resolvers/deletedProducts");
 const cartResolver = require("../resolvers/cart");
 const saleResolver = require("../resolvers/sales");
+const invoiceResolver = require("../resolvers/invoice");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const organisationContactResolver = require("../resolvers/organisationContact");
+const OrganisationBranchResolver = require("../resolvers/organisationBranch");
 const tagsResolver = require("../resolvers/tags");
 const firbaseResolver = require("../resolvers/firebaseImageUpload");
 const uploadImage = require("../middleware/uploadImage");
@@ -36,6 +38,14 @@ let routes = (app) => {
     "/organisation/deletionReason",
     organisationProfileResolver.deleteOrganisationProfileDeletionReason
   );
+
+
+router.get("/branches",authMiddleware, OrganisationBranchResolver.getBranch)
+router.post("/branches/create",authMiddleware, OrganisationBranchResolver.createBranch)
+router.put("/branch/add",authMiddleware, OrganisationBranchResolver.addBranch)
+router.put("/branch/edit",authMiddleware, OrganisationBranchResolver.editBranch)
+router.put("/branch/delete",authMiddleware, OrganisationBranchResolver.deleteBranch)
+
 
   router.get("/user", organisationUsersResolver.getOrganisationUser);
 
@@ -94,6 +104,13 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
   router.post("/sale/create", authMiddleware, saleResolver.createSale);
   router.delete("/sale/delete", authMiddleware, saleResolver.deleteSale);
   router.put("/sale/edit", authMiddleware, saleResolver.editSale);
+
+
+  router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
+  router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
+  router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);  
+  router.delete("/invoice/delete", authMiddleware, invoiceResolver.deleteInvoice);
+  router.put("/invoice/edit", authMiddleware, invoiceResolver.editInvoice);
 
 
 

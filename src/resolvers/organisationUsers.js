@@ -31,15 +31,12 @@ const createOrganisationUsers = async (req, res) => {
 const getOrganisationUser = async (req, res) => {
   try {
     const { userId } = req.query;
-    const user = await OrganisationUserModel.find({ userId });
-    if (!user) return res.status(400).send({ message: "user not found" });
-    return res.status(200).send({ message: "current user", user: user });
+    const user = await OrganisationUserModel.findOne({ userId });
+    return res.status(200).send(user);
   } catch (error) {
     return res.status(500).send(error.message);
   }
 };
-
-
 
 module.exports = {
   createOrganisationUsers,

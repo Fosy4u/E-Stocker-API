@@ -6,9 +6,9 @@ const createOrganisationContact = async (req, res) => {
     if (!email) return res.status(400).send({ message: "email is required" });
    if(!organisationId) return res.status(400).send({ message: "organisationId is required" });
     console.log("email", email);
-    const contact = await OrganisationContactModel.find({ email });
+    const contact = await OrganisationContactModel.findOne({ email, organisationId });
     console.log("contact", contact);
-    if (contact.length > 0) {
+    if (contact) {
       return res
         .status(400)
         .send("oops! A contact with same email address is already existing.");

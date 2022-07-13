@@ -3,6 +3,12 @@ const RecieptModel = require("../models/receipt");
 const InvoiceModel = require("../models/invoice");
 const ProductModel = require("../models/products");
 const TagModel = require("../models/tags");
+const QRCode = require("qrcode");
+
+const generateQRCode = async (stringData) => {
+  const code = QRCode.toDataURL(stringData);
+  return code;
+};
 
 const verifyProducts = async (data) => {
   return data.reduce(async (acc, curr) => {
@@ -15,38 +21,47 @@ const verifyProducts = async (data) => {
   }, []);
 };
 
-const generateReceipt = async (data) => {
+const generateReceipt = async (data, lastReceipt) => {
   console.log("generating receipt");
   try {
-    const { organisationId } = data;
-  
+    const { organisationId, customerDetail, organisation, totalSellingPrice } =
+      data;
+    const { firstName, lastName } = customerDetail;
+    const stringData = `${organisation?.name} ${
+      lastReceipt?.invoiceNo + 1 || 1 + "-" + firstName
+    } ${lastName + "-total-" + totalSellingPrice.toFixed(2)}`;
+    const QrCode = await generateQRCode(stringData);
+
     recieptDate = new Date();
-    const lastReceipt = await RecieptModel.findOne({ organisationId }).sort({
-      createdAt: -1,
-    });
+
     const receipt = await RecieptModel.create({
       ...data,
       recieptNo: lastReceipt?.recieptNo + 1 || 1,
       recieptDate,
+      QrCode,
     });
     return receipt;
   } catch (error) {
     console.log("error", error);
   }
 };
-const generateInvoice = async (data) => {
-  console.log("generating receipt");
+const generateInvoice = async (data, lastInvoice) => {
+  console.log("generating invoice");
   try {
-    const { organisationId } = data;
-  
+    const { organisationId, customerDetail, organisation, amountDue } = data;
+    const { firstName, lastName } = customerDetail;
+    const stringData = `${organisation?.name} ${
+      lastInvoice?.invoiceNo + 1 || 1 + "-" + firstName
+    } ${lastName + "-total-" + amountDue.toFixed(2)}`;
+    const QrCode = await generateQRCode(stringData);
+
     invoiceDate = new Date();
-    const lastInvoice = await InvoiceModel.findOne({ organisationId }).sort({
-      createdAt: -1,
-    });
+
     const invoice = await InvoiceModel.create({
       ...data,
       invoiceNo: lastInvoice?.invoiceNo + 1 || 1,
       invoiceDate,
+      QrCode,
     });
     return invoice;
   } catch (error) {
@@ -57,7 +72,7 @@ const generateInvoice = async (data) => {
 const updateProducts = async (summary, sale_id, salesPerson) => {
   try {
     let updatedProducts = 0;
-   const myPromise =  Object.entries(summary).map(
+    const myPromise = Object.entries(summary).map(
       async ([productId, detail]) => {
         const log = {
           action: "sold",
@@ -124,10 +139,9 @@ const updateProducts = async (summary, sale_id, salesPerson) => {
         }
         console.log("product updated", updatedProducts);
       }
-    )
-    await Promise.all(myPromise)
+    );
+    await Promise.all(myPromise);
     return updatedProducts;
-    
   } catch (error) {
     console.log(error);
   }
@@ -147,6 +161,7 @@ const createSale = async (req, res) => {
           " Error! one or more of the products are not existing in the system",
       });
     }
+
     const sale = await SaleModel.create(req.body);
     if (!sale) return res.status(400).send({ message: "sale not recorded" });
     console.log("sale generated");
@@ -163,8 +178,12 @@ const createSale = async (req, res) => {
       });
     }
 
+    const params = { ...req.body };
     if (paymentMethod !== "invoice") {
-      const receipt = await generateReceipt(req.body);
+      const lastReceipt = await RecieptModel.findOne({ organisationId }).sort({
+        createdAt: -1,
+      });
+      const receipt = await generateReceipt(params, lastReceipt);
       if (!receipt) {
         return res
           .status(400)
@@ -172,12 +191,15 @@ const createSale = async (req, res) => {
       }
       return res.status(200).send(receipt);
     }
-    const invoice = await generateInvoice(req.body);
+    const lastInvoice = await InvoiceModel.findOne({ organisationId }).sort({
+      createdAt: -1,
+    });
+    const invoice = await generateInvoice(params, lastInvoice);
     if (!invoice) {
-        return res
-            .status(400)
-            .send({ message: "sales recored but couldnt generate invoice" });
-        }
+      return res
+        .status(400)
+        .send({ message: "sales recored but couldnt generate invoice" });
+    }
     return res.status(200).send(invoice);
   } catch (error) {
     return res.status(500).send(error.message);
