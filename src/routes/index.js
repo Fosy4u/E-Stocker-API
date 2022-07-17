@@ -12,6 +12,7 @@ const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const organisationContactResolver = require("../resolvers/organisationContact");
 const OrganisationBranchResolver = require("../resolvers/organisationBranch");
+const autoGeneratorResolver = require('../resolvers/autoGenerator')
 const tagsResolver = require("../resolvers/tags");
 const firbaseResolver = require("../resolvers/firebaseImageUpload");
 const uploadImage = require("../middleware/uploadImage");
@@ -113,6 +114,13 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
   router.put("/invoice/edit", authMiddleware, invoiceResolver.editInvoice);
 
 
+  router.get("/autogenerator/invoice", authMiddleware, autoGeneratorResolver.getNewInvoiceNo);
+  router.get("/autogenerator/currentconfig", authMiddleware, autoGeneratorResolver.getCurrentConfig);
+  router.put("/autogenerator/updateconfig", authMiddleware, autoGeneratorResolver.updateAutoGenerator);
+  router.put("/autogenerator/setDefaultInvoicePolicy", authMiddleware, autoGeneratorResolver.setDefaultInvoicePolicy);
+  router.put("/autogenerator/deleteInvoicePolicy", authMiddleware, autoGeneratorResolver.deleteInvoicePolicy);
+  router.put("/autogenerator/updateInvoicePolicy", authMiddleware, autoGeneratorResolver.updateInvoicePolicy);
+  
 
   router.get("/tags", authMiddleware, tagsResolver.getTags);
   router.post("/tags/create", authMiddleware, tagsResolver.createProductTag);

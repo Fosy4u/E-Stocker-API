@@ -85,7 +85,6 @@ const addBranch = async (req, res) => {
   try {
     const { _id, name, address, region, country, email, phoneNo } =
       req.body?.branches;
-
     if (!_id) return res.status(400).send({ message: "_id is required" });
     if (!name) return res.status(400).send({ message: "name is required" });
     if (!address)

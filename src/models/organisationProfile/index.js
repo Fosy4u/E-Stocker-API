@@ -57,6 +57,7 @@ const OrganisationProfileSchema = new mongoose.Schema({
   social: SocialSchema,
   regionalSettings: RegionalSettings,
   active: { type: Boolean, required: true, default: true },
+  autoInvoiceNo: { type: Boolean, required: true, default: true },
   deletionReasons: {
     type: Array,
     default: [
