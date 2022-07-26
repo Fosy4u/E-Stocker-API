@@ -29,7 +29,7 @@ const ProductSchema = new mongoose.Schema(
     sellingPrice: { type: Number, required: false },
     unitCostPrice: { type: Number, required: false },
     unitSellingPrice: { type: Number, required: false },
-    quantity: { type: Number, required: false },
+    quantity: { type: Number, required: false, default: 1 },
     vat: { type: Boolean, required: true, default: "false" },
     unit: { type: String, required: false },
     businessLine: { type: String, required: false },

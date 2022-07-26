@@ -12,7 +12,7 @@ const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const organisationContactResolver = require("../resolvers/organisationContact");
 const OrganisationBranchResolver = require("../resolvers/organisationBranch");
-const autoGeneratorResolver = require('../resolvers/autoGenerator')
+const autoGeneratorResolver = require("../resolvers/autoGenerator");
 const tagsResolver = require("../resolvers/tags");
 const firbaseResolver = require("../resolvers/firebaseImageUpload");
 const uploadImage = require("../middleware/uploadImage");
@@ -40,13 +40,43 @@ let routes = (app) => {
     organisationProfileResolver.deleteOrganisationProfileDeletionReason
   );
 
+  router.get(
+    "/organisation/bankDetails",
+    authMiddleware,
+    organisationProfileResolver.getBankDetails
+  );
+  router.post(
+    "/organisation/bankDetails/update",
+    authMiddleware,
+    organisationProfileResolver.updateBankDetails
+  );
+  router.put(
+    "/organisation/bankDetails/delete",
+    authMiddleware,
+    organisationProfileResolver.deleteBankDetails
+  );
 
-router.get("/branches",authMiddleware, OrganisationBranchResolver.getBranch)
-router.post("/branches/create",authMiddleware, OrganisationBranchResolver.createBranch)
-router.put("/branch/add",authMiddleware, OrganisationBranchResolver.addBranch)
-router.put("/branch/edit",authMiddleware, OrganisationBranchResolver.editBranch)
-router.put("/branch/delete",authMiddleware, OrganisationBranchResolver.deleteBranch)
-
+  router.get("/branches", authMiddleware, OrganisationBranchResolver.getBranch);
+  router.post(
+    "/branches/create",
+    authMiddleware,
+    OrganisationBranchResolver.createBranch
+  );
+  router.put(
+    "/branch/add",
+    authMiddleware,
+    OrganisationBranchResolver.addBranch
+  );
+  router.put(
+    "/branch/edit",
+    authMiddleware,
+    OrganisationBranchResolver.editBranch
+  );
+  router.put(
+    "/branch/delete",
+    authMiddleware,
+    OrganisationBranchResolver.deleteBranch
+  );
 
   router.get("/user", organisationUsersResolver.getOrganisationUser);
 
@@ -93,12 +123,9 @@ router.put("/branch/delete",authMiddleware, OrganisationBranchResolver.deleteBra
     deletedProductsResolver.getProducts
   );
 
-
-router.get("/cart", authMiddleware, cartResolver.getCart);
-router.post("/cart/create", authMiddleware, cartResolver.createCart);
-router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
-
-
+  router.get("/cart", authMiddleware, cartResolver.getCart);
+  router.post("/cart/create", authMiddleware, cartResolver.createCart);
+  router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
 
   router.get("/sales", authMiddleware, saleResolver.getAllSales);
   router.get("/sale", authMiddleware, saleResolver.getSale);
@@ -106,21 +133,51 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
   router.delete("/sale/delete", authMiddleware, saleResolver.deleteSale);
   router.put("/sale/edit", authMiddleware, saleResolver.editSale);
 
-
   router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
   router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
-  router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);  
-  router.delete("/invoice/delete", authMiddleware, invoiceResolver.deleteInvoice);
+  router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
+  router.delete(
+    "/invoice/delete",
+    authMiddleware,
+    invoiceResolver.deleteInvoice
+  );
   router.put("/invoice/edit", authMiddleware, invoiceResolver.editInvoice);
+  router.put(
+    "/invoice/validate/invoiceno",
+    authMiddleware,
+    invoiceResolver.validateInvoiceNo
+  );
 
-
-  router.get("/autogenerator/invoice", authMiddleware, autoGeneratorResolver.getNewInvoiceNo);
-  router.get("/autogenerator/currentconfig", authMiddleware, autoGeneratorResolver.getCurrentConfig);
-  router.put("/autogenerator/updateconfig", authMiddleware, autoGeneratorResolver.updateAutoGenerator);
-  router.put("/autogenerator/setDefaultInvoicePolicy", authMiddleware, autoGeneratorResolver.setDefaultInvoicePolicy);
-  router.put("/autogenerator/deleteInvoicePolicy", authMiddleware, autoGeneratorResolver.deleteInvoicePolicy);
-  router.put("/autogenerator/updateInvoicePolicy", authMiddleware, autoGeneratorResolver.updateInvoicePolicy);
-  
+  router.get(
+    "/autogenerator/invoice",
+    authMiddleware,
+    autoGeneratorResolver.getNewInvoiceNo
+  );
+  router.get(
+    "/autogenerator/currentconfig",
+    authMiddleware,
+    autoGeneratorResolver.getCurrentConfig
+  );
+  router.put(
+    "/autogenerator/updateconfig",
+    authMiddleware,
+    autoGeneratorResolver.updateAutoGenerator
+  );
+  router.put(
+    "/autogenerator/setDefaultInvoicePolicy",
+    authMiddleware,
+    autoGeneratorResolver.setDefaultInvoicePolicy
+  );
+  router.put(
+    "/autogenerator/deleteInvoicePolicy",
+    authMiddleware,
+    autoGeneratorResolver.deleteInvoicePolicy
+  );
+  router.put(
+    "/autogenerator/updateInvoicePolicy",
+    authMiddleware,
+    autoGeneratorResolver.updateInvoicePolicy
+  );
 
   router.get("/tags", authMiddleware, tagsResolver.getTags);
   router.post("/tags/create", authMiddleware, tagsResolver.createProductTag);
@@ -132,9 +189,6 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
     uploadController.getProductTemplate
   );
   router.get("/download", authMiddleware, uploadController.download);
-
-
-
 
   //OrganisationContact
   router.post(
@@ -151,17 +205,16 @@ router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
     "/organisationContact/editContact",
     authMiddleware,
     organisationContactResolver.editOrganisationContact
-    
   );
   router.put(
     "/organisationContact/deleteContact",
     authMiddleware,
-   organisationContactResolver.deleteOrganisationContact
+    organisationContactResolver.deleteOrganisationContact
   );
   router.put(
     "/organisationContact/restoreContact",
     authMiddleware,
-   organisationContactResolver.restoreOrganisationContact
+    organisationContactResolver.restoreOrganisationContact
   );
 
   return app.use("/", router);

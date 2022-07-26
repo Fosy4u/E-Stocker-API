@@ -2,6 +2,12 @@
 const mongoose = require("mongoose");
 const timestamp = require("mongoose-timestamp");
 
+const BankDetailSchema = new mongoose.Schema({
+  bankName: { type: String, required: false },
+  accountName: { type: String, required: false },
+  accountNumber: { type: String, required: false }
+ 
+});
 const SocialSchema = new mongoose.Schema({
   twitter: String,
   linkedIn: String,
@@ -68,6 +74,7 @@ const OrganisationProfileSchema = new mongoose.Schema({
       "stock re-evaluation",
     ],
   },
+  bankDetails: { type: [BankDetailSchema] },
 });
 
 OrganisationProfileSchema.plugin(timestamp);

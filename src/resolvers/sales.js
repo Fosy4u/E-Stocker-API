@@ -2,6 +2,7 @@ const SaleModel = require("../models/sales");
 const RecieptModel = require("../models/receipt");
 const InvoiceModel = require("../models/invoice");
 const ProductModel = require("../models/products");
+const AutoGeneratorModel = require("../models/autoGenerator/index");
 const TagModel = require("../models/tags");
 const QRCode = require("qrcode");
 
@@ -21,22 +22,63 @@ const verifyProducts = async (data) => {
   }, []);
 };
 
+const getReceiptNo = async (organisationId, autoGenerator) => {
+  try {
+    let result;
+    const { nextAutoRecieptNo, recieptPrefix } = autoGenerator;
+    const recieptNo = recieptPrefix + nextAutoRecieptNo;
+
+    const exist = await RecieptModel.findOne({ organisationId, recieptNo });
+    if (!exist) {
+      result = { newAutoGenerator: { ...autoGenerator }, recieptNo };
+
+      if (result !== undefined) {
+      
+        return result;
+      }
+    } else {
+      const newAutoGenerator = autoGenerator;
+      newAutoGenerator.nextAutoRecieptNo = nextAutoRecieptNo + 1;
+
+      return (recursion = await getReceiptNo(organisationId, newAutoGenerator));
+    }
+  } catch (error) {
+    return false;
+  }
+};
+
 const generateReceipt = async (data, lastReceipt) => {
   console.log("generating receipt");
   try {
     const { organisationId, customerDetail, organisation, totalSellingPrice } =
       data;
+    const autoGenerator = await AutoGeneratorModel.findOne({ organisationId });
+    if (!autoGenerator) return false;
+    const nextAutoRecieptNo = await getReceiptNo(organisationId, autoGenerator);
+    const { newAutoGenerator, recieptNo } = nextAutoRecieptNo;
+    if (newAutoGenerator) {
+      const update = await AutoGeneratorModel.findOneAndUpdate(
+        { organisationId },
+        { ...newAutoGenerator },
+        { new: true }
+      );
+    }
+   
+    if (recieptNo === undefined) {
+      return false;
+    }
     const { firstName, lastName } = customerDetail;
     const stringData = `${organisation?.name} ${
       lastReceipt?.invoiceNo + 1 || 1 + "-" + firstName
     } ${lastName + "-total-" + totalSellingPrice.toFixed(2)}`;
     const QrCode = await generateQRCode(stringData);
 
-    recieptDate = new Date();
+    const recieptDate = new Date();
 
     const receipt = await RecieptModel.create({
       ...data,
-      recieptNo: lastReceipt?.recieptNo + 1 || 1,
+      //  recieptNo: lastReceipt?.recieptNo + 1 || 1,
+      recieptNo,
       recieptDate,
       QrCode,
     });
@@ -45,22 +87,25 @@ const generateReceipt = async (data, lastReceipt) => {
     console.log("error", error);
   }
 };
-const generateInvoice = async (data, lastInvoice) => {
-  console.log("generating invoice");
+const generateInvoice = async (data) => {
   try {
-    const { organisationId, customerDetail, organisation, amountDue } = data;
+    const {
+      organisationId,
+      customerDetail,
+      organisation,
+      amountDue,
+      invoiceNo,
+    } = data;
     const { firstName, lastName } = customerDetail;
-    const stringData = `${organisation?.name} ${
-      lastInvoice?.invoiceNo + 1 || 1 + "-" + firstName
-    } ${lastName + "-total-" + amountDue.toFixed(2)}`;
+    const stringData = `${organisation?.name} ${invoiceNo + "-" + firstName} ${
+      lastName + "-total-" + amountDue.toFixed(2)
+    }`;
     const QrCode = await generateQRCode(stringData);
 
     invoiceDate = new Date();
 
     const invoice = await InvoiceModel.create({
       ...data,
-      invoiceNo: lastInvoice?.invoiceNo + 1 || 1,
-      invoiceDate,
       QrCode,
     });
     return invoice;
@@ -191,10 +236,8 @@ const createSale = async (req, res) => {
       }
       return res.status(200).send(receipt);
     }
-    const lastInvoice = await InvoiceModel.findOne({ organisationId }).sort({
-      createdAt: -1,
-    });
-    const invoice = await generateInvoice(params, lastInvoice);
+
+    const invoice = await generateInvoice(params);
     if (!invoice) {
       return res
         .status(400)

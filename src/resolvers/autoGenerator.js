@@ -1,5 +1,6 @@
 const AutoGeneratorModel = require("../models/autoGenerator/index");
 const OrganisationProfileModel = require("../models/organisationProfile");
+const InvoiceModel = require("../models/invoice");
 
 const getNewInvoiceNo = async (req, res) => {
   try {
@@ -18,6 +19,33 @@ const getNewInvoiceNo = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+const verifyAutoInvoiceNo = async (organisationId, autoGenerator) => {
+  try {
+    // const autoGenerator = await AutoGeneratorModel.findOne({ organisationId });
+    // if (!autoGenerator) return false;
+    const { nextAutoInvoiceNo, invoicePrefix } = autoGenerator;
+    const invoiceNo = invoicePrefix + nextAutoInvoiceNo;
+    const exist = await InvoiceModel.findOne({ organisationId, invoiceNo });
+    if (!exist) {
+      console.log("not exist", invoiceNo);
+      const update = await AutoGeneratorModel.findOneAndUpdate(
+        { organisationId },
+        { ...autoGenerator }
+      );
+      if (update) return update;
+    } else {
+      const newAutoGenerator = autoGenerator;
+      newAutoGenerator.nextAutoInvoiceNo = nextAutoInvoiceNo + 1;
+      console.log("newAutoGenerator", newAutoGenerator);
+      const recursion = await verifyAutoInvoiceNo(
+        organisationId,
+        newAutoGenerator
+      );
+    }
+  } catch (error) {
+    return false;
+  }
+};
 
 const getCurrentConfig = async (req, res) => {
   try {
@@ -30,9 +58,13 @@ const getCurrentConfig = async (req, res) => {
       _id: organisationId,
     });
     const autoInvoiceNo = organisation.autoInvoiceNo;
+    const verifiedAutoGenerator = await verifyAutoInvoiceNo(
+      organisationId,
+      autoGenerator
+    );
     const config = {
       autoInvoiceNo,
-      autoGenerator,
+      autoGenerator: verifiedAutoGenerator,
     };
     return res.status(200).send(config);
   } catch (error) {
@@ -42,23 +74,32 @@ const getCurrentConfig = async (req, res) => {
 
 const updateAutoGenerator = async (req, res) => {
   try {
-    const organisationId = req.body.organisationId;
+    const { organisationId, autoInvoiceNo, nextAutoInvoiceNo, invoicePrefix } = req.body;
     if (!organisationId)
       return res.status(400).send("organisationId is required");
     const updatedOrganisation = await OrganisationProfileModel.findOneAndUpdate(
       {
         _id: organisationId,
       },
-      { autoInvoiceNo: req.body.autoInvoiceNo }
-    );
-    console.log(
-      "🚀 ~ file: autoGenerator.js ~ line 74 ~ updateAutoGenerator ~ updatedOrganisation",
-      updatedOrganisation
+      { autoInvoiceNo }
     );
 
     if (!updatedOrganisation)
-      return res.status(400).send("autoGenerator not found");
-    return res.status(200).send(updatedOrganisation);
+      return res.status(400).send("couldnt update autoGenerator");
+    const autoGenerator = await AutoGeneratorModel.findOne({ organisationId });
+    if (!autoGenerator)
+      return res.status(400).send("invoice autoGenerator not found");
+    const update = await AutoGeneratorModel.findOneAndUpdate(
+      { organisationId },
+      {
+        nextAutoInvoiceNo,
+        invoicePrefix,
+      }
+    );
+    if (!update)
+      return res.status(400).send("couldnt update invoice autoGenerator");
+    return res.status(200).send(update);
+ 
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -181,6 +222,7 @@ const updatePolicy = async (organisationId, data, res) => {
           $set: { "invoiceDuePolicy.$.name": name },
           $set: { "invoiceDuePolicy.$.value": value },
         },
+       
         { new: true }
       );
       if (!updatePolicy) {
