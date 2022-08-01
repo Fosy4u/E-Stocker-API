@@ -201,6 +201,11 @@ let routes = (app) => {
     authMiddleware,
     organisationContactResolver.getAllOrganisationContacts
   );
+  router.get(
+    "/organisationContact/Contact",
+    authMiddleware,
+    organisationContactResolver.getOrganisationContact
+  );
   router.put(
     "/organisationContact/editContact",
     authMiddleware,

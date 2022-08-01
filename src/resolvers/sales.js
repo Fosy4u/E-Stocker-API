@@ -11,6 +11,24 @@ const generateQRCode = async (stringData) => {
   return code;
 };
 
+const checkIndex = (arr) => {
+  arr.map((item) => {
+    const { index } = item;
+    if (index === undefined || index === null) {
+      return false;
+    }
+  });
+  var tmpArr = [];
+  for (var obj in arr) {
+    if (tmpArr.indexOf(arr[obj].index) < 0) {
+      tmpArr.push(arr[obj].index);
+    } else {
+      return false; // Duplicate value for property1 found
+    }
+  }
+  return true; // No duplicate values found for property1
+};
+
 const verifyProducts = async (data) => {
   return data.reduce(async (acc, curr) => {
     const result = await acc;
@@ -33,7 +51,6 @@ const getReceiptNo = async (organisationId, autoGenerator) => {
       result = { newAutoGenerator: { ...autoGenerator }, recieptNo };
 
       if (result !== undefined) {
-      
         return result;
       }
     } else {
@@ -47,7 +64,7 @@ const getReceiptNo = async (organisationId, autoGenerator) => {
   }
 };
 
-const generateReceipt = async (data, lastReceipt) => {
+const generateReceipt = async (data, sale_id) => {
   console.log("generating receipt");
   try {
     const { organisationId, customerDetail, organisation, totalSellingPrice } =
@@ -63,13 +80,13 @@ const generateReceipt = async (data, lastReceipt) => {
         { new: true }
       );
     }
-   
+
     if (recieptNo === undefined) {
       return false;
     }
     const { firstName, lastName } = customerDetail;
     const stringData = `${organisation?.name} ${
-      lastReceipt?.invoiceNo + 1 || 1 + "-" + firstName
+      recieptNo || 1 + "-" + firstName
     } ${lastName + "-total-" + totalSellingPrice.toFixed(2)}`;
     const QrCode = await generateQRCode(stringData);
 
@@ -81,13 +98,14 @@ const generateReceipt = async (data, lastReceipt) => {
       recieptNo,
       recieptDate,
       QrCode,
+      sale_id,
     });
     return receipt;
   } catch (error) {
     console.log("error", error);
   }
 };
-const generateInvoice = async (data) => {
+const generateInvoice = async (data, sale_id) => {
   try {
     const {
       organisationId,
@@ -107,6 +125,7 @@ const generateInvoice = async (data) => {
     const invoice = await InvoiceModel.create({
       ...data,
       QrCode,
+      sale_id,
     });
     return invoice;
   } catch (error) {
@@ -198,7 +217,7 @@ const createSale = async (req, res) => {
     const { organisationId, paymentMethod, summary, salesPerson } = req.body;
 
     if (!organisationId)
-      return res.status(400).send({ message: "organisationId is required" });
+      return res.status(400).send("organisationId is required");
     const invalidProducts = await verifyProducts(Object.keys(summary));
     if (invalidProducts?.length > 0) {
       return res.status(400).send({
@@ -206,8 +225,19 @@ const createSale = async (req, res) => {
           " Error! one or more of the products are not existing in the system",
       });
     }
-
-    const sale = await SaleModel.create(req.body);
+    const verifyIndex = await checkIndex(Object.values(summary));
+    if (!verifyIndex) {
+      return res
+        .status(400)
+        .send(
+          " Error! can't verify index of selected products for sale. Please check the product index and ensure they are unique"
+        );
+    }
+    const lastSale = await SaleModel.findOne({ organisationId }).sort({
+      createdAt: -1,
+    });
+    const saleIndex = lastSale?.saleIndex + 1 || 1;
+    const sale = await SaleModel.create({ ...req.body, saleIndex });
     if (!sale) return res.status(400).send({ message: "sale not recorded" });
     console.log("sale generated");
     const updatedProducts = await updateProducts(
@@ -225,10 +255,8 @@ const createSale = async (req, res) => {
 
     const params = { ...req.body };
     if (paymentMethod !== "invoice") {
-      const lastReceipt = await RecieptModel.findOne({ organisationId }).sort({
-        createdAt: -1,
-      });
-      const receipt = await generateReceipt(params, lastReceipt);
+      const sale_id = sale._id;
+      const receipt = await generateReceipt(params, sale_id);
       if (!receipt) {
         return res
           .status(400)
@@ -237,7 +265,7 @@ const createSale = async (req, res) => {
       return res.status(200).send(receipt);
     }
 
-    const invoice = await generateInvoice(params);
+    const invoice = await generateInvoice(params, sale._id);
     if (!invoice) {
       return res
         .status(400)
@@ -273,15 +301,85 @@ const getAllSales = async (req, res) => {
 };
 const editSale = async (req, res) => {
   try {
-    const { _id } = req.body;
+    const {
+      _id,
+      bankDetails,
+      invoiceDate,
+      branch,
+      dueDate,
+      summary,
+      customerNote,
+      deliveryCharge,
+      subTotal,
+      customerDetail,
+      index,
+      amountDue,
+      salesNote,
+      customerId,
+      currency,
+      totalSellingPrice,
+ 
+    } = req.body;
+
+    const params = {
+      bankDetails,
+      invoiceDate,
+      branch,
+      dueDate,
+      customerNote,
+      deliveryCharge,
+      subTotal,
+      customerDetail,
+      index,
+      summary,
+      amountDue,
+      salesNote,
+      customerId,
+      currency,
+      totalSellingPrice,
+    };
     if (!_id) return res.status(400).send({ message: "sale_id is required" });
+    const invalidProducts = await verifyProducts(Object.keys(summary));
+    if (invalidProducts?.length > 0) {
+      return res.status(400).send({
+        message:
+          " Error! one or more of the products are not existing in the system",
+      });
+    }
+    const verifyIndex = await checkIndex(Object.values(summary));
+    if (!verifyIndex) {
+      return res
+        .status(400)
+        .send(
+          " Error! can't verify index of selected products for sale. Please check the product index and ensure they are unique"
+        );
+    }
     const sale = await SaleModel.findByIdAndUpdate(
       req.body._id,
-      { ...req.body },
+      { ...params },
       { new: true }
     );
     if (!sale) return res.status(400).send({ message: "sale not found" });
-    return res.status(200).send({ message: "sale", sale: sale });
+    const paymentMethod = sale.paymentMethod;
+    if (paymentMethod === "invoice") {
+      const invoice = await InvoiceModel.findOne({ sale_id: sale._id });
+      const updatedInvoice = await InvoiceModel.findByIdAndUpdate(
+        { _id: invoice._id },
+        {
+          ...params,
+        }
+      );
+      if (!updatedInvoice) return res.status(400).send("invoice not updated");
+      return res.status(200).send(updatedInvoice);
+    }
+    const updatedReceipt = await RecieptModel.findOneAndUpdate(
+      { sale_id: _id },
+      {
+        ...params,
+      }
+    );
+    if (!updatedReceipt) return res.status(400).send("receipt not updated");
+    return res.status(200).send(updatedReceipt);
   } catch (error) {
     return res.status(500).send(error.message);
   }

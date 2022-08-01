@@ -43,7 +43,7 @@ const getOrganisationContact = async (req, res) => {
     if (!_id) return res.status(400).send({ message: "contact_id is required" });
     const contact = await OrganisationContactModel.findById({ _id });
     if (!contact) return res.status(400).send({ message: "contact not found" });
-    return res.status(200).send({ message: "contact", contact: contact });
+    return res.status(200).send( contact );
   } catch (error) {
     return res.status(500).send(error.message);
   }

@@ -8,11 +8,14 @@ const SummarySchema = new mongoose.Schema(
     vat: { type: Boolean, required: false },
     discount: { type: Number, required: false },
     finalPrice: { type: Number, required: true },
+    semiFinalPrice: { type: Number, required: false },
+    newPrice: { type: Number, required: false },
     quantity: { type: Number, required: true },
     productId: { type: String, required: true },
     name: { type: String, required: true },
     productCode: { type: String, required: true },
     salesRemark: { type: String, required: false },
+    index: { type: Number, required: true },
   },
   { _id: false }
 );
@@ -31,6 +34,7 @@ const RecieptSchema = new mongoose.Schema(
       },
     },
     organisationId: { type: String, required: true },
+    sale_id: { type: String, required: true },
     recieptNo: { type: String, required: true },
     paymentMethod: { type: String, value: "reciept" },
     recieptDate: { type: String, required: true },
@@ -44,6 +48,7 @@ const RecieptSchema = new mongoose.Schema(
       branchId: { type: String, required: false },
     },
     customerNote: { type: String },
+    salesNote: { type: String },
     status: { type: String, default: "active" },
     customerDetail: {
       firstName: { type: String, required: false },
@@ -53,10 +58,18 @@ const RecieptSchema = new mongoose.Schema(
       address: { type: String, required: false },
       salutation: { type: String, required: false },
     },
+    bankDetails: {
+      bankId: { type: String, required: true },
+      bankName: { type: String, required: false },
+      accountName: { type: String, required: false },
+      accountNumber: { type: String, required: false },
+    },
 
     salesPerson: { type: String, required: true },
     QrCode: { type: String, required: true },
     totalSellingPrice: { type: String, required: true },
+    deliveryCharge: { type: String, required: true },
+    subTotal: { type: String, required: true },
   },
 
   { timestamps: true }

@@ -14,6 +14,7 @@ const CartSchema = new mongoose.Schema(
     status: { type: String, required: true },
     user: { type: String, required: true },
     branch: { type: String, required: true },
+    deliveryCharge: { type: String, required: true },
 
   },
 

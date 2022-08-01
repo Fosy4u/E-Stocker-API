@@ -17,7 +17,7 @@ const getInvoice = async (req, res) => {
       return res.status(400).send({ message: "no invoiceId provided" });
     const invoice = await InvoiceModel.findById(req.query._id).lean();
     if (!invoice) return res.status(400).send({ message: "invoice not found" });
-    return res.status(200).send({ message: "invoice", invoice: invoice });
+    return res.status(200).send(invoice);
   } catch (error) {
     return res.status(500).send(error.message);
   }
