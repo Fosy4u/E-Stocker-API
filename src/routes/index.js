@@ -8,6 +8,7 @@ const deletedProductsResolver = require("../resolvers/deletedProducts");
 const cartResolver = require("../resolvers/cart");
 const saleResolver = require("../resolvers/sales");
 const invoiceResolver = require("../resolvers/invoice");
+const receiptResolver = require("../resolvers/receipt");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
 const organisationContactResolver = require("../resolvers/organisationContact");
@@ -153,6 +154,19 @@ let routes = (app) => {
     authMiddleware,
     autoGeneratorResolver.getNewInvoiceNo
   );
+
+
+
+
+  router.put(
+    "/receipt/validate/receiptno",
+    authMiddleware,
+    receiptResolver.validateReceiptNo
+  );
+
+
+
+
   router.get(
     "/autogenerator/currentconfig",
     authMiddleware,

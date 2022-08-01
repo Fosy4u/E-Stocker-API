@@ -62,9 +62,9 @@ const AutoGeneratorSchema = new mongoose.Schema(
       ],
     },
 
-    recieptPrefix: { type: String, default: "REC-" },
+    receiptPrefix: { type: String, default: "REC-" },
     nextAutoInvoiceNo: { type: Number, default: "0001" },
-    nextAutoRecieptNo: { type: Number, default: "0001" },
+    nextAutoReceiptNo: { type: Number, default: "0001" },
   },
   { timestamps: true }
 );

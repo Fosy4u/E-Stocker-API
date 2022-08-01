@@ -20,6 +20,17 @@ const SummarySchema = new mongoose.Schema(
   { _id: false }
 );
 
+const BankDetailsSchema = new mongoose.Schema(
+  {
+    bankId: { type: String, required: true },
+    bankName: { type: String, required: false },
+    address: { type: String, required: false },
+    accountName: { type: String, required: false },
+    accountNumber: { type: String, required: false },
+  },
+  { _id: false }
+);
+
 const InvoiceSchema = new mongoose.Schema(
   {
     customerId: { type: String, required: true },
@@ -45,12 +56,7 @@ const InvoiceSchema = new mongoose.Schema(
       phoneNo: { type: String, required: false },
       branchId: { type: String, required: true },
     },
-    bankDetails: {
-      bankId: { type: String, required: true },
-      bankName: { type: String, required: false },
-      accountName: { type: String, required: false },
-      accountNumber: { type: String, required: false },
-    },
+    bankDetails: BankDetailsSchema,
     customerNote: { type: String },
     salesNote: { type: String },
     status: { type: String, required: true },
