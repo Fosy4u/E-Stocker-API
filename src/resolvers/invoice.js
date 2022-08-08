@@ -1,4 +1,5 @@
 const InvoiceModel = require("../models/invoice");
+const SaleModel = require("../models/sales");
 
 const getAllInvoice = async (req, res) => {
   try {
@@ -16,7 +17,21 @@ const getInvoice = async (req, res) => {
     if (!req.query._id)
       return res.status(400).send({ message: "no invoiceId provided" });
     const invoice = await InvoiceModel.findById(req.query._id).lean();
-    if (!invoice) return res.status(400).send({ message: "invoice not found" });
+    if (!invoice) return res.status(200).send({});
+    return res.status(200).send(invoice);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const getInvoiceByParam = async (req, res) => {
+  try {
+    const param = req.query;
+    const organisationId = req.query.organisationId;
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+    const invoice = await InvoiceModel.find({ ...param }).lean();
+    if (!invoice)
+      return res.status(400).send("invoice with matching param not found");
     return res.status(200).send(invoice);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -48,6 +63,54 @@ const editInvoice = async (req, res) => {
     );
     if (update) {
       return res.status(200).send({ message: "invoice", invoice: update });
+    }
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const stampInvoice = async (req, res) => {
+  try {
+    const { _id, stage, user } = req.body;
+    const log = {
+      date: new Date(),
+      user: user?.name,
+      action: "stamp",
+      reason: "invoice sent to customer",
+      details: "stamped ",
+    };
+    if (!_id)
+      return res.status(400).send({ message: "invoice_id is required" });
+    if (!user) return res.status(400).send("user is required");
+    if (!stage) return res.status(400).send("stage is required");
+    const update = await InvoiceModel.findByIdAndUpdate(
+      _id,
+      { ...req.body },
+      { new: true }
+    );
+    if (update) {
+      const log = {
+        date: new Date(),
+        user: user?.name,
+        action: "stamp",
+        reason: "invoice sent to customer",
+        details: `stamped ${update.invoiceNo} as sent`,
+      };
+      const sale = await SaleModel.findOne({ invoiceNo: update.invoiceNo });
+      const updateLog = await SaleModel.findByIdAndUpdate(
+        sale._id,
+        { $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateLog)
+        return res.status(400).send("invoice stamped but couldnt update log");
+      const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+        update._id,
+        { $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateIvoiceLog)
+        return res.status(400).send(" invoice stamped but failed to update");
+      return res.status(200).send(updateIvoiceLog);
     }
   } catch (error) {
     return res.status(500).send(error.message);
@@ -95,4 +158,6 @@ module.exports = {
   editInvoice,
   deleteInvoice,
   validateInvoiceNo,
+  getInvoiceByParam,
+  stampInvoice,
 };

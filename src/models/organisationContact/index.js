@@ -38,7 +38,8 @@ const OrganisationContactSchema = new mongoose.Schema({
       user: String,
       userId: String,
       action: String,
-      details: String,
+      details: String
+   
     },
   ],
 });

@@ -10,6 +10,8 @@ const SummarySchema = new mongoose.Schema(
     finalPrice: { type: Number, required: true },
     semiFinalPrice: { type: Number, required: false },
     newPrice: { type: Number, required: false },
+    originalRate: { type: Number, required: true },
+    costRate: { type: Number, required: true },
     quantity: { type: Number, required: true },
     productId: { type: String, required: true },
     name: { type: String, required: true },
@@ -60,6 +62,7 @@ const InvoiceSchema = new mongoose.Schema(
     customerNote: { type: String },
     salesNote: { type: String },
     status: { type: String, required: true },
+    stage: { type: String, required: true, default: "draft" },
     customerDetail: {
       firstName: { type: String, required: false },
       lastName: { type: String, required: false },
@@ -68,8 +71,24 @@ const InvoiceSchema = new mongoose.Schema(
       address: { type: String, required: false },
       salutation: { type: String, required: false },
     },
+    logs: [
+      {
+        date: Date,
+        user: String,
+        userId: String,
+        action: String,
+        details: String,
+        difference: [{ _id: false, field: String, old: String, new: String }],
+        reason: String,
+      },
+      { _id: false },
+    ],
 
-    salesPerson: { type: String, required: true },
+    salesPerson: {
+      name: { type: String, required: true },
+      id: { type: String, required: true },
+    },
+
     QrCode: { type: String, required: true },
     disable: { type: String, default: "false" },
     deliveryCharge: { type: String, required: true },

@@ -6,6 +6,24 @@ const AutoGeneratorModel = require("../models/autoGenerator/index");
 const TagModel = require("../models/tags");
 const QRCode = require("qrcode");
 
+const adjustDate = (data) => {
+  if (data < 10) {
+    return `0${data}`;
+  }
+  return data;
+};
+
+const displayDate = (date) => {
+  const parsedDate = new Date(date);
+  const month = new Intl.DateTimeFormat("en-US", {
+    month: "long",
+  }).format(parsedDate);
+  const parsedDateValue = adjustDate(parsedDate.getFullYear());
+  const parsedDateDay = adjustDate(parsedDate.getDate());
+
+  return `${parsedDateDay} ${month} ${parsedDateValue} `;
+};
+
 const generateQRCode = async (stringData) => {
   const code = QRCode.toDataURL(stringData);
   return code;
@@ -204,6 +222,16 @@ const createSale = async (req, res) => {
   console.log("started");
   try {
     const { organisationId, paymentMethod, summary, salesPerson } = req.body;
+    const logs = [
+      {
+        date: new Date(),
+        user: salesPerson?.name,
+        userId: salesPerson?.id,
+        action: "create",
+        details: `created ${req.body?.invoiceNo || req.body?.receiptNo}`,
+        reason: "sold product",
+      },
+    ];
 
     if (!organisationId)
       return res.status(400).send("organisationId is required");
@@ -226,7 +254,7 @@ const createSale = async (req, res) => {
       createdAt: -1,
     });
     const saleIndex = lastSale?.saleIndex + 1 || 1;
-    const sale = await SaleModel.create({ ...req.body, saleIndex });
+    const sale = await SaleModel.create({ ...req.body, saleIndex, logs });
     if (!sale) return res.status(400).send({ message: "sale not recorded" });
     console.log("sale generated");
     const updatedProducts = await updateProducts(
@@ -242,7 +270,7 @@ const createSale = async (req, res) => {
       });
     }
 
-    const params = { ...req.body };
+    const params = { ...req.body, logs };
     if (paymentMethod !== "invoice") {
       const receipt = await generateReceipt(params, sale._id);
       if (!receipt) {
@@ -306,7 +334,164 @@ const editSale = async (req, res) => {
       customerId,
       currency,
       totalSellingPrice,
+      paymentMethod,
+      user,
+      reason,
     } = req.body;
+
+    if (!_id) return res.status(400).send("sale_id is required");
+    const invalidProducts = await verifyProducts(Object.keys(summary));
+    if (invalidProducts?.length > 0) {
+      return res.status(400).send({
+        message:
+          " Error! one or more of the products are not existing in the system",
+      });
+    }
+    if (!user) return res.status(400).send("editing user is required");
+    if (!reason)
+      return res.status(400).send("reason for modification is required");
+    const verifyIndex = await checkIndex(Object.values(summary));
+    if (!verifyIndex) {
+      return res
+        .status(400)
+        .send(
+          " Error! can't verify index of selected products for sale. Please check the product index and ensure they are unique"
+        );
+    }
+    console.log("_id", _id);
+    const currentSales = await SaleModel.findById(_id);
+    if (!currentSales) return res.status(400).send("Error!, sale not found");
+    let currentInvoice = {};
+    let currentReceipt = {};
+    if (paymentMethod === "invoice") {
+      currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
+    }
+    if (paymentMethod === "receipt") {
+      currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+    }
+    const difference = [];
+    if (
+      bankDetails?.bankName &&
+      bankDetails?.bankName !== currentSales.bankDetails?.bankName
+    ) {
+      difference.push({
+        field: "bank Details",
+        old: currentSales.bankDetails?.bankName,
+        new: bankDetails?.bankName,
+      });
+    }
+    if (invoiceDate !== "undefined") {
+      if (
+        new Date(invoiceDate)?.setHours(0, 0, 0, 0) !==
+        new Date(currentInvoice.invoiceDate)?.setHours(0, 0, 0, 0)
+      ) {
+        difference.push({
+          field: "invoice date",
+          old: displayDate(new Date(currentInvoice?.invoiceDate)),
+          new: displayDate(new Date(invoiceDate)),
+        });
+      }
+    }
+    if (
+      branch?.name &&
+      currentSales.branch?.name &&
+      branch?.name !== currentSales.branch?.name
+    ) {
+      difference.push({
+        field: "branch",
+        old: currentSales?.branch?.name,
+        new: branch?.name,
+      });
+    }
+    if (
+      dueDate &&
+      new Date(dueDate)?.setHours(0, 0, 0, 0) !==
+        new Date(currentSales.dueDate)?.setHours(0, 0, 0, 0)
+    ) {
+      difference.push({
+        field: "due date",
+        old: displayDate(new Date(currentSales?.dueDate)),
+        new: displayDate(new Date(dueDate)),
+      });
+    }
+    if (customerNote && customerNote !== currentSales.customerNote) {
+      difference.push({
+        field: "customer note",
+        old: currentSales?.customerNote,
+        new: customerNote,
+      });
+    }
+    if (deliveryCharge && deliveryCharge !== currentSales.deliveryCharge) {
+      difference.push({
+        field: "delivery charge",
+        old: currentSales?.deliveryCharge,
+        new: deliveryCharge,
+      });
+    }
+    if (`${subTotal}` != currentSales.subTotal) {
+      difference.push({
+        field: "sub total",
+        old: currentSales?.subTotal,
+        new: subTotal,
+      });
+    }
+    if (
+      customerDetail?.firstName !== currentSales.customerDetail?.firstName ||
+      customerDetail?.lastName !== currentSales.customerDetail?.lastName ||
+      customerDetail?.phone !== currentSales.customerDetail?.phone ||
+      customerDetail?.email !== currentSales.customerDetail?.email
+    ) {
+      difference.push({
+        field: "customer detail",
+        old:
+          currentSales?.customerDetail?.firstName +
+          " " +
+          currentSales?.customerDetail?.lastName,
+        new: customerDetail?.firstName + " " + customerDetail?.lastName,
+      });
+    }
+    if (`${amountDue}` != currentSales?.amountDue) {
+      difference.push({
+        field: "amount due",
+        old: currentSales.amountDue,
+        new: amountDue,
+      });
+    }
+    if (salesNote !== currentSales?.salesNote) {
+      difference.push({
+        field: "sales note",
+        old: currentSales?.salesNote,
+        new: salesNote,
+      });
+    }
+    if (currency !== currentSales.currency) {
+      difference.push({
+        field: "currency",
+        old: currentSales?.currency,
+        new: currency,
+      });
+    }
+    if (deliveryCharge !== currentSales.deliveryCharge) {
+      difference.push({
+        field: "delivery charge",
+        old: currentSales?.deliveryCharge,
+        new: deliveryCharge,
+      });
+    }
+    if (paymentMethod !== currentSales.paymentMethod) {
+      difference.push({
+        field: "payment method",
+        old: currentSales?.paymentMethod,
+        new: paymentMethod,
+      });
+    }
+    const log = {
+      date: new Date(),
+      user: user?.name,
+      action: "edit",
+      reason: reason,
+      difference: difference,
+    };
 
     const params = {
       bankDetails,
@@ -324,31 +509,20 @@ const editSale = async (req, res) => {
       customerId,
       currency,
       totalSellingPrice,
+      paymentMethod,
     };
-    if (!_id) return res.status(400).send({ message: "sale_id is required" });
-    const invalidProducts = await verifyProducts(Object.keys(summary));
-    if (invalidProducts?.length > 0) {
-      return res.status(400).send({
-        message:
-          " Error! one or more of the products are not existing in the system",
-      });
-    }
-    const verifyIndex = await checkIndex(Object.values(summary));
-    if (!verifyIndex) {
-      return res
-        .status(400)
-        .send(
-          " Error! can't verify index of selected products for sale. Please check the product index and ensure they are unique"
-        );
-    }
+
     const sale = await SaleModel.findByIdAndUpdate(
       req.body._id,
       { ...params },
       { new: true }
     );
-    if (!sale) return res.status(400).send({ message: "sale not found" });
-    const paymentMethod = sale.paymentMethod;
-    if (paymentMethod === "invoice") {
+    if (!sale && difference?.length === 0)
+      return res.status(200).send("No changes made to the sale");
+    if (!sale && difference?.length > 0)
+      return res.status(400).send("Error! could not update sale");
+
+    if (sale.paymentMethod === "invoice") {
       const invoice = await InvoiceModel.findOne({ sale_id: sale._id });
       const updatedInvoice = await InvoiceModel.findByIdAndUpdate(
         { _id: invoice._id },
@@ -357,6 +531,23 @@ const editSale = async (req, res) => {
         }
       );
       if (!updatedInvoice) return res.status(400).send("invoice not updated");
+      if (difference.length > 0) {
+        const updateLog = await SaleModel.findByIdAndUpdate(
+          sale._id,
+          { $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateLog)
+          return res.status(400).send("invoice updated but couldnt update log");
+        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+          invoice._id,
+          { $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateIvoiceLog)
+          return res.status(400).send(" invoice modified but failed to update");
+        return res.status(200).send(updateIvoiceLog);
+      }
       return res.status(200).send(updatedInvoice);
     }
     const updatedReceipt = await ReceiptModel.findOneAndUpdate(
@@ -366,6 +557,24 @@ const editSale = async (req, res) => {
       }
     );
     if (!updatedReceipt) return res.status(400).send("receipt not updated");
+    if (difference.length > 0) {
+      const updateLog = await SaleModel.findByIdAndUpdate(
+        sale._id,
+        { $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateIvoiceLog)
+        return res.status(400).send(" receipt modified but failed to update");
+      const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+        updatedReceipt._id,
+        { $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateReceiptLog)
+        return res.status(400).send(" Receipt modified but failed to update");
+      return res.status(200).send(updateReceiptLog);
+    }
+
     return res.status(200).send(updatedReceipt);
   } catch (error) {
     return res.status(500).send(error.message);

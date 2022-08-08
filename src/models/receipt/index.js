@@ -10,6 +10,8 @@ const SummarySchema = new mongoose.Schema(
     finalPrice: { type: Number, required: true },
     semiFinalPrice: { type: Number, required: false },
     newPrice: { type: Number, required: false },
+    originalRate: { type: Number, required: true },
+    costRate: { type: Number, required: true },
     quantity: { type: Number, required: true },
     productId: { type: String, required: true },
     name: { type: String, required: true },
@@ -71,8 +73,24 @@ const ReceiptSchema = new mongoose.Schema(
     },
     bankDetails: BankDetailsSchema,
     bankTransactionReference: { type: String },
+    logs: [
+      {
+        date: Date,
+        user: String,
+        userId: String,
+        action: String,
+        details: String,
+        difference: [ { _id: false, field: String, old: String, new: String } ],
+        reason: String,
+      },
+      { _id: false }
+    ],
 
-    salesPerson: { type: String, required: true },
+    salesPerson: {
+      name: { type: String, required: true },
+      id: { type: String, required: true },
+    },
+
     QrCode: { type: String, required: true },
     totalSellingPrice: { type: String, required: true },
     deliveryCharge: { type: String, required: true },

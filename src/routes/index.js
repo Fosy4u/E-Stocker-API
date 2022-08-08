@@ -136,6 +136,7 @@ let routes = (app) => {
 
   router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
   router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
+  router.get("/invoice/param", authMiddleware, invoiceResolver. getInvoiceByParam);
   router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
   router.delete(
     "/invoice/delete",
@@ -143,6 +144,7 @@ let routes = (app) => {
     invoiceResolver.deleteInvoice
   );
   router.put("/invoice/edit", authMiddleware, invoiceResolver.editInvoice);
+  router.put("/invoice/stamp", authMiddleware, invoiceResolver.stampInvoice);
   router.put(
     "/invoice/validate/invoiceno",
     authMiddleware,

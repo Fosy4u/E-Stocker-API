@@ -11,6 +11,8 @@ const SummarySchema = new mongoose.Schema(
     finalPrice: { type: Number, required: true },
     semiFinalPrice: { type: Number, required: false },
     newPrice: { type: Number, required: false },
+    originalRate: { type: Number, required: true },
+    costRate: { type: Number, required: true },
     quantity: { type: Number, required: true },
     productId: { type: String, required: true },
     name: { type: String, required: true },
@@ -81,8 +83,35 @@ const SaleSchema = new mongoose.Schema(
       branchId: { type: String, required: false },
     },
     bankDetails: BankDetailsSchema,
+    logs: {
+      type: [
+        {
+          date: Date,
+          user: String,
+          userId: String,
+          action: String,
+          details: String,
+          reason: String,
+          difference: [ { _id: false, field: String, old: String, new: String } ],
+        },
+        { _id: false }
+      ],
+      default: [
+        {
+          date: Date,
+          user: String,
+          userId: String,
+          action: String,
+          details: String,
+          reason: String,
+        },
+      ],
+    },
 
-    salesPerson: { type: String, required: true },
+    salesPerson: {
+      name: { type: String, required: true },
+      id: { type: String, required: true },
+    },
     QrCode: { type: String, required: false },
   },
 
