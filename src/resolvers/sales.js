@@ -295,9 +295,13 @@ const createSale = async (req, res) => {
 
 const getSale = async (req, res) => {
   try {
-    if (!req.query._id)
-      return res.status(400).send({ message: "no saleId provided" });
-    const sale = await SaleModel.findById(req.query._id);
+    const { status } = req.query;
+    if (!status) return res.status(400).send("no status provided");
+    if (!req.query._id) return res.status(400).send("no saleId provided");
+    const sale = await SaleModel.findById(req.query._id)
+      .where("status")
+      .equals(status)
+      .lean();
     if (!sale) return res.status(400).send({ message: "sale not found" });
     return res.status(200).send({ message: "sale", sale: sale });
   } catch (error) {
@@ -306,10 +310,15 @@ const getSale = async (req, res) => {
 };
 const getAllSales = async (req, res) => {
   try {
+    const { status } = req.query;
+    if (!status) return res.status(400).send("no status provided");
     const organisationId = req.query.organisationId;
     if (!organisationId)
-      return res.status(400).send({ message: "organisationId is required" });
-    const sales = await SaleModel.find({ organisationId });
+      return res.status(400).send("organisationId is required");
+    const sales = await SaleModel.find({ organisationId })
+      .where("status")
+      .equals(status)
+      .lean();
     return res.status(200).send(sales);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -580,19 +589,272 @@ const editSale = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
-const deleteSale = async (req, res) => {
+const addComment = async (req, res) => {
   try {
-    const { _id } = req.body;
-    if (!_id) return res.status(400).send({ message: "sale_id is required" });
-    const disabled = await SaleModel.findByIdAndUpdate(
+    const { _id, comment, customerPortal, user } = req.body;
+
+    if (!_id) return res.status(400).send("sale_id is required");
+    if (!comment) return res.status(400).send("comment is required");
+    if (!user?.name) return res.status(400).send("user is required");
+    const currentSales = await SaleModel.findById(_id);
+    if (!currentSales) return res.status(400).send("Error!, sale not found");
+    let currentInvoice = {};
+    let currentReceipt = {};
+    if (currentSales.paymentMethod === "invoice") {
+      currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
+    }
+    if (currentSales.paymentMethod === "receipt") {
+      currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+    }
+
+    const log = {
+      date: new Date(),
+      user: user?.name,
+      action: "comment",
+      comment,
+      customerPortal,
+    };
+    const updateLog = await SaleModel.findByIdAndUpdate(
       _id,
-      { status: "disabled" },
+      { $push: { logs: log } },
       { new: true }
     );
-    if (!disabled) return res.status(400).send({ message: "sale not found" });
-    return res.status(200).send({ message: "sale", sale: disabled });
+    if (!updateLog)
+      return res.status(400).send("invoice updated but couldnt update log");
+    if (updateLog.paymentMethod === "invoice") {
+      const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+        currentInvoice._id,
+        { $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateIvoiceLog)
+        return res.status(400).send(" invoice modified but failed to update");
+      return res.status(200).send(updateIvoiceLog);
+    }
+
+    const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+      currentReceipt._id,
+      { $push: { logs: log } },
+      { new: true }
+    );
+    if (!updateReceiptLog)
+      return res.status(400).send(" Receipt modified but failed to update");
+    return res.status(200).send(updateReceiptLog);
   } catch (error) {
     return res.status(500).send(error.message);
   }
 };
-module.exports = { createSale, getSale, getAllSales, editSale, deleteSale };
+const deleteComment = async (req, res) => {
+  try {
+    const { _id, commentId, user, organisationId } = req.body;
+
+    if (!_id) return res.status(400).send("sale_id is required");
+    if (!commentId) return res.status(400).send("commentId is required");
+    if (!user?.name) return res.status(400).send("user is required");
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+
+    const currentSales = await SaleModel.findOne({
+      organisationId,
+      _id,
+    });
+    if (!currentSales) return res.status(400).send("Error!, sale not found");
+    let currentInvoice = {};
+    let currentReceipt = {};
+    if (currentSales.paymentMethod === "invoice") {
+      currentInvoice = await InvoiceModel.findOne({
+        sale_id: _id,
+        organisationId,
+        logs: { $elemMatch: { _id: commentId } },
+      });
+      if (!currentInvoice)
+        return res.status(400).send("comment on invoice not found");
+    }
+    if (currentSales.paymentMethod === "receipt") {
+      currentReceipt = await ReceiptModel.findOne({
+        sale_id: _id,
+        organisationId,
+        logs: { $elemMatch: { _id: commentId } },
+      });
+      if (!currentReceipt)
+        return res.status(400).send("comment on receipt not found");
+    }
+
+    const updateLog = await SaleModel.findByIdAndUpdate(
+      { _id: currentSales._id },
+      { $pull: { logs: { _id: commentId } } },
+      { new: true }
+    );
+    if (!updateLog)
+      return res.status(400).send("invoice updated but couldnt update log");
+    if (updateLog.paymentMethod === "invoice") {
+      const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+        { _id: currentInvoice._id },
+        { $pull: { logs: { _id: commentId } } },
+        { new: true }
+      );
+      if (!updateIvoiceLog)
+        return res.status(400).send(" invoice modified but failed to update");
+      return res.status(200).send(updateIvoiceLog);
+    }
+
+    const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+      { _id: currentReceipt._id },
+      { $pull: { logs: { _id: commentId } } },
+      { new: true }
+    );
+    if (!updateReceiptLog)
+      return res.status(400).send(" Receipt modified but failed to update");
+    return res.status(200).send(updateReceiptLog);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const deleteSale = async (req, res) => {
+  try {
+    const { _ids, reason, user } = req.body;
+
+    const log = {
+      date: new Date(),
+      user: user?.name,
+      action: "delete",
+      reason: reason,
+      details: "deleted sale",
+    };
+
+    if (_ids && _ids?.length === 0)
+      return res.status(400).send("sale_id is required");
+    if (!reason) return res.status(400).send("reason is required");
+    if (!user?.name) return res.status(400).send("user is required");
+    let invalidSales = [];
+    const validate = _ids.map(async (_id) => {
+      const currentSales = await SaleModel.findById(_id);
+      if (!currentSales) invalidSales.push(_id);
+      await Promise.all(validate);
+      if (invalidSales?.length > 0)
+        return res
+          .status(400)
+          .send("Error!, cant find sales with ids: " + invalidSales);
+    });
+
+    let mutatedSales = [];
+    const mutate = _ids.map(async (_id) => {
+      const updateLog = await SaleModel.findByIdAndUpdate(
+        _id,
+        { status: "disabled", $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateLog) mutatedSales.push(_id);
+      let currentInvoice = {};
+      let currentReceipt = {};
+      if (updateLog?.paymentMethod === "invoice") {
+        currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
+        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+          { _id: currentInvoice?._id },
+          { status: "disabled", $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateIvoiceLog) {
+          mutatedSales.push(currentInvoice?._id);
+        }
+      } else {
+        currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+        const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+          { _id: currentReceipt._id },
+          { status: "disabled", $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateReceiptLog) {
+          mutatedSales.push(currentReceipt?._id);
+        }
+      }
+    });
+    await Promise.all(mutate);
+    if (mutatedSales.length > 0) {
+      return res.status(400).send("Error!, in deleting sales");
+    }
+    return res.status(200).send({ message: "Successfully deleted sales" });
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const restoreSale = async (req, res) => {
+ 
+  try {
+    const { _ids, reason, user } = req.body;
+
+    const log = {
+      date: new Date(),
+      user: user?.name,
+      action: "restore",
+      reason: reason,
+      details: "restored sale",
+    };
+
+    if (_ids && _ids?.length === 0)
+      return res.status(400).send("sale_id is required");
+    if (!reason) return res.status(400).send("reason is required");
+    if (!user?.name) return res.status(400).send("user is required");
+    let invalidSales = [];
+    const validate = _ids.map(async (_id) => {
+      const currentSales = await SaleModel.findById(_id);
+      if (!currentSales) invalidSales.push(_id);
+      await Promise.all(validate);
+      if (invalidSales?.length > 0)
+        return res
+          .status(400)
+          .send("Error!, cant find sales with ids: " + invalidSales);
+    });
+
+    let mutatedSales = [];
+    const mutate = _ids.map(async (_id) => {
+      const updateLog = await SaleModel.findByIdAndUpdate(
+        _id,
+        { status: "active", $push: { logs: log } },
+        { new: true }
+      );
+      if (!updateLog) mutatedSales.push(_id);
+      let currentInvoice = {};
+      let currentReceipt = {};
+      if (updateLog?.paymentMethod === "invoice") {
+        currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
+        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+          { _id: currentInvoice?._id },
+          { status: "active", $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateIvoiceLog) {
+          mutatedSales.push(currentInvoice?._id);
+        }
+      } else {
+        currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+        const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+          { _id: currentReceipt._id },
+          { status: "active", $push: { logs: log } },
+          { new: true }
+        );
+        if (!updateReceiptLog) {
+          mutatedSales.push(currentReceipt?._id);
+        }
+      }
+    });
+    await Promise.all(mutate);
+    if (mutatedSales.length > 0) {
+      return res.status(400).send("Error!, in deleting sales");
+    }
+    return res.status(200).send({ message: "Successfully deleted sales" });
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
+module.exports = {
+  createSale,
+  getSale,
+  getAllSales,
+  editSale,
+  deleteSale,
+  addComment,
+  deleteComment,
+  restoreSale,
+};

@@ -92,9 +92,11 @@ const SaleSchema = new mongoose.Schema(
           action: String,
           details: String,
           reason: String,
+          comment: String,
           difference: [ { _id: false, field: String, old: String, new: String } ],
+          customerPortal: { type: Boolean, default: false },
         },
-        { _id: false }
+      
       ],
       default: [
         {

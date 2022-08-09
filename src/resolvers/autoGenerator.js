@@ -275,7 +275,6 @@ const deleteInvoicePolicy = async (req, res) => {
     if (policy.core) {
       return res.status(400).send("cannot delete core policy");
     }
-    console.log("reached here");
     const removePolicy = await AutoGeneratorModel.findOneAndUpdate(
       {
         organisationId,

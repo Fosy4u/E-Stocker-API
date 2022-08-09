@@ -80,10 +80,12 @@ const ReceiptSchema = new mongoose.Schema(
         userId: String,
         action: String,
         details: String,
+        comment: String,
         difference: [ { _id: false, field: String, old: String, new: String } ],
         reason: String,
+        customerPortal: { type: Boolean, default: false },
       },
-      { _id: false }
+   
     ],
 
     salesPerson: {

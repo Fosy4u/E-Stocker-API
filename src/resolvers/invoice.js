@@ -3,10 +3,15 @@ const SaleModel = require("../models/sales");
 
 const getAllInvoice = async (req, res) => {
   try {
+    const { status } = req.query;
+    if (!status) return res.status(400).send("no status provided");
     const organisationId = req.query.organisationId;
     if (!organisationId)
-      return res.status(400).send({ message: "organisationId is required" });
-    const invoices = await InvoiceModel.find({ organisationId }).lean();
+      return res.status(400).send("organisationId is required");
+    const invoices = await InvoiceModel.find({ organisationId })
+      .where("status")
+      .equals(status)
+      .lean();
     return res.status(200).send(invoices);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -14,9 +19,13 @@ const getAllInvoice = async (req, res) => {
 };
 const getInvoice = async (req, res) => {
   try {
-    if (!req.query._id)
-      return res.status(400).send({ message: "no invoiceId provided" });
-    const invoice = await InvoiceModel.findById(req.query._id).lean();
+    const { status } = req.query;
+    if (!status) return res.status(400).send("no status provided");
+    if (!req.query._id) return res.status(400).send("no invoiceId provided");
+    const invoice = await InvoiceModel.findById(req.query._id)
+      .where("status")
+      .equals(status)
+      .lean();
     if (!invoice) return res.status(200).send({});
     return res.status(200).send(invoice);
   } catch (error) {

@@ -131,12 +131,19 @@ let routes = (app) => {
   router.get("/sales", authMiddleware, saleResolver.getAllSales);
   router.get("/sale", authMiddleware, saleResolver.getSale);
   router.post("/sale/create", authMiddleware, saleResolver.createSale);
-  router.delete("/sale/delete", authMiddleware, saleResolver.deleteSale);
+  router.put("/sale/delete", authMiddleware, saleResolver.deleteSale);
+  router.put("/sale/restore", authMiddleware, saleResolver.restoreSale);
   router.put("/sale/edit", authMiddleware, saleResolver.editSale);
+  router.put("/sale/addComment", authMiddleware, saleResolver.addComment);
+  router.put("/sale/deleteComment", authMiddleware, saleResolver.deleteComment);
 
   router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
   router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
-  router.get("/invoice/param", authMiddleware, invoiceResolver. getInvoiceByParam);
+  router.get(
+    "/invoice/param",
+    authMiddleware,
+    invoiceResolver.getInvoiceByParam
+  );
   router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
   router.delete(
     "/invoice/delete",
@@ -157,17 +164,11 @@ let routes = (app) => {
     autoGeneratorResolver.getNewInvoiceNo
   );
 
-
-
-
   router.put(
     "/receipt/validate/receiptno",
     authMiddleware,
     receiptResolver.validateReceiptNo
   );
-
-
-
 
   router.get(
     "/autogenerator/currentconfig",
