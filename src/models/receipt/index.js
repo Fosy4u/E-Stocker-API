@@ -97,6 +97,9 @@ const ReceiptSchema = new mongoose.Schema(
     totalSellingPrice: { type: String, required: true },
     deliveryCharge: { type: String, required: true },
     subTotal: { type: String, required: true },
+    invoiceList: { type: Array},
+    invoicePayment: { type: Boolean, default: false },
+    overPayment: { type: Number, default: 0 },
   },
 
   { timestamps: true }

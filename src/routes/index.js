@@ -144,6 +144,11 @@ let routes = (app) => {
     authMiddleware,
     invoiceResolver.getInvoiceByParam
   );
+  router.get(
+    "/invoice/customer",
+    authMiddleware,
+    invoiceResolver.getCustomerInvoice
+  );
   router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
   router.delete(
     "/invoice/delete",
@@ -158,16 +163,23 @@ let routes = (app) => {
     invoiceResolver.validateInvoiceNo
   );
 
+  router.get("/receipts", authMiddleware, receiptResolver.getAllReceipt);
+  router.get("/receipt", authMiddleware, receiptResolver.getReceipt);
   router.get(
-    "/autogenerator/invoice",
+    "/receipt/param",
     authMiddleware,
-    autoGeneratorResolver.getNewInvoiceNo
+    receiptResolver.getReceiptByParam
   );
-
   router.put(
     "/receipt/validate/receiptno",
     authMiddleware,
     receiptResolver.validateReceiptNo
+  );
+
+  router.get(
+    "/autogenerator/invoice",
+    authMiddleware,
+    autoGeneratorResolver.getNewInvoiceNo
   );
 
   router.get(

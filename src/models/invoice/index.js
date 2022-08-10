@@ -83,7 +83,18 @@ const InvoiceSchema = new mongoose.Schema(
         reason: String,
         customerPortal: { type: Boolean, default: false },
       },
-    
+    ],
+    paymentList: [
+      {
+        paymantDate: Date,
+        receiptId: String,
+        amountPaid: String,
+        customerId: String,
+        paymentMethod: String,
+        bankDetails: BankDetailsSchema,
+        customerNote: { type: String },
+        salesNote: { type: String },
+      },
     ],
 
     salesPerson: {

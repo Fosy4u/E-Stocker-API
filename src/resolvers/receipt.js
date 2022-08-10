@@ -2,27 +2,50 @@ const ReceiptModel = require("../models/receipt");
 
 const getAllReceipt = async (req, res) => {
     try {
-        const organisationId = req.query.organisationId;
-        if (!organisationId)
-        return res.status(400).send({ message: "organisationId is required" });
-        const receipts = await ReceiptModel.find({ organisationId }).lean();
-        return res.status(200).send(receipts);
+      const { status } = req.query;
+      if (!status) return res.status(400).send("no status provided");
+      const organisationId = req.query.organisationId;
+      if (!organisationId)
+        return res.status(400).send("organisationId is required");
+      const receipts = await ReceiptModel.find({ organisationId })
+        .where("status")
+        .equals(status)
+        .lean();
+      return res.status(200).send(receipts);
     } catch (error) {
-        return res.status(500).send(error.message);
+      return res.status(500).send(error.message);
     }
-}
-
-const getReceipt = async (req, res) => {
+  };
+  const getReceipt = async (req, res) => {
     try {
-        if (!req.query._id)
-        return res.status(400).send({ message: "no receiptId provided" });
-        const receipt = await ReceiptModel.findById(req.query._id).lean();
-        if (!receipt) return res.status(400).send({ message: "receipt not found" });
-        return res.status(200).send(receipt);
+      const { status } = req.query;
+      if (!status) return res.status(400).send("no status provided");
+      if (!req.query._id) return res.status(400).send("no receiptId provided");
+      const receipt = await ReceiptModel.findById(req.query._id)
+        .where("status")
+        .equals(status)
+        .lean();
+      if (!receipt) return res.status(200).send({});
+      return res.status(200).send(receipt);
     } catch (error) {
-        return res.status(500).send(error.message);
+      return res.status(500).send(error.message);
     }
-}
+  };
+
+  const getReceiptByParam = async (req, res) => {
+    try {
+      const param = req.query;
+      const organisationId = req.query.organisationId;
+      if (!organisationId)
+        return res.status(400).send("organisationId is required");
+      const receipt = await ReceiptModel.find({ ...param }).lean();
+      if (!receipt)
+        return res.status(400).send("receipt with matching param not found");
+      return res.status(200).send(receipt);
+    } catch (error) {
+      return res.status(500).send(error.message);
+    }
+  };
 
 const createReceipt = async (req, res) => {
     try {
@@ -98,5 +121,6 @@ module.exports = {
     createReceipt,
     editReceipt,
     deleteReceipt,
-    validateReceiptNo
+    validateReceiptNo,
+    getReceiptByParam
 }

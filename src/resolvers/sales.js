@@ -229,7 +229,7 @@ const createSale = async (req, res) => {
         userId: salesPerson?.id,
         action: "create",
         details: `created ${req.body?.invoiceNo || req.body?.receiptNo}`,
-        reason: "sold product",
+        reason: `sold product via ` + paymentMethod,
       },
     ];
 
@@ -597,13 +597,14 @@ const addComment = async (req, res) => {
     if (!comment) return res.status(400).send("comment is required");
     if (!user?.name) return res.status(400).send("user is required");
     const currentSales = await SaleModel.findById(_id);
+
     if (!currentSales) return res.status(400).send("Error!, sale not found");
     let currentInvoice = {};
     let currentReceipt = {};
     if (currentSales.paymentMethod === "invoice") {
       currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
     }
-    if (currentSales.paymentMethod === "receipt") {
+    if (currentSales.paymentMethod !== "invoice") {
       currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
     }
 
@@ -631,7 +632,7 @@ const addComment = async (req, res) => {
         return res.status(400).send(" invoice modified but failed to update");
       return res.status(200).send(updateIvoiceLog);
     }
-
+    console.log("currentReceipt", currentReceipt);
     const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
       currentReceipt._id,
       { $push: { logs: log } },
@@ -779,7 +780,6 @@ const deleteSale = async (req, res) => {
   }
 };
 const restoreSale = async (req, res) => {
- 
   try {
     const { _ids, reason, user } = req.body;
 

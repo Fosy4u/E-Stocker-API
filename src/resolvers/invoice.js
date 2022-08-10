@@ -38,7 +38,10 @@ const getInvoiceByParam = async (req, res) => {
     const organisationId = req.query.organisationId;
     if (!organisationId)
       return res.status(400).send("organisationId is required");
-    const invoice = await InvoiceModel.find({ ...param }).lean();
+    const invoice = await InvoiceModel.find({ ...param })
+      .where("status")
+      .equals("active")
+      .lean();
     if (!invoice)
       return res.status(400).send("invoice with matching param not found");
     return res.status(200).send(invoice);
@@ -46,6 +49,55 @@ const getInvoiceByParam = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+const calcBalance = (amountDue, paymentList) => {
+  console.log("came here");
+  let balance = amountDue;
+  if (paymentList.length === 0) {
+    return balance;
+  }
+  paymentList.forEach((payment) => {
+    balance -= payment.amountPaid;
+  });
+  return balance;
+};
+
+const checkOutstanding = (invoices) => {
+  console.log(
+    "🚀 ~ file: invoice.js ~ line 61 ~ checkOutstanding ~ invoices",
+    invoices?.length
+  );
+  let outstanding = [];
+  invoices?.forEach((invoice) => {
+    const { amountDue, paymentList } = invoice;
+    const balance = calcBalance(amountDue, paymentList || []);
+    if (balance > 0) {
+      outstanding.push(invoice);
+    }
+  });
+  return outstanding;
+};
+
+const getCustomerInvoice = async (req, res) => {
+  try {
+    const { customerId, outstanding } = req.query;
+
+    const organisationId = req.query.organisationId;
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+    if (!customerId) return res.status(400).send("customerId is required");
+    const invoice = await InvoiceModel.find({ customerId, organisationId })
+      .where("status")
+      .equals("active")
+      .lean();
+    if (!invoice) return res.status(200).send([]);
+    if (!outstanding) return res.status(200).send(invoice);
+    const outstandingInvoice = checkOutstanding(invoice);
+    return res.status(200).send(outstandingInvoice);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
 const createInvoice = async (req, res) => {
   try {
     const organisationId = req.body.organisationId;
@@ -169,4 +221,5 @@ module.exports = {
   validateInvoiceNo,
   getInvoiceByParam,
   stampInvoice,
+  getCustomerInvoice,
 };
