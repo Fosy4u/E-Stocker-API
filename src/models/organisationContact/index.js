@@ -38,8 +38,11 @@ const OrganisationContactSchema = new mongoose.Schema({
       user: String,
       userId: String,
       action: String,
-      details: String
-   
+      details: String,
+      comment: String,
+      difference: [{ _id: false, field: String, old: String, new: String }],
+      reason: String,
+      customerPortal: { type: Boolean, default: false },
     },
   ],
 });

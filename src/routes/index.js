@@ -130,6 +130,11 @@ let routes = (app) => {
 
   router.get("/sales", authMiddleware, saleResolver.getAllSales);
   router.get("/sale", authMiddleware, saleResolver.getSale);
+  router.get(
+    "/sales/deleted",
+    authMiddleware,
+    saleResolver.getAllDeletedInvoiceAndReceipt
+  );
   router.post("/sale/create", authMiddleware, saleResolver.createSale);
   router.put("/sale/delete", authMiddleware, saleResolver.deleteSale);
   router.put("/sale/restore", authMiddleware, saleResolver.restoreSale);
@@ -148,6 +153,11 @@ let routes = (app) => {
     "/invoice/customer",
     authMiddleware,
     invoiceResolver.getCustomerInvoice
+  );
+  router.get(
+    "/invoice/receipt",
+    authMiddleware,
+    invoiceResolver.getInvoiceReceipts
   );
   router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
   router.delete(
@@ -170,10 +180,25 @@ let routes = (app) => {
     authMiddleware,
     receiptResolver.getReceiptByParam
   );
+  router.get(
+    "/receipt/customer/overpayment",
+    authMiddleware,
+    receiptResolver.getAllCustomerOverPayment
+  );
   router.put(
     "/receipt/validate/receiptno",
     authMiddleware,
     receiptResolver.validateReceiptNo
+  );
+  router.post(
+    "/receipt/create/invoiceLinkedPayment",
+    authMiddleware,
+    receiptResolver.createInvoiceLinkedPayment
+  );
+  router.post(
+    "/receipt/update/invoiceLinkedPayment",
+    authMiddleware,
+    receiptResolver.updateInvoiceLinkedReceipt
   );
 
   router.get(

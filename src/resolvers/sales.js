@@ -89,14 +89,14 @@ const generateReceipt = async (data, sale_id) => {
       organisationId,
       customerDetail,
       organisation,
-      amountDue,
       receiptNo,
+      amountPaid,
     } = data;
 
     const { firstName, lastName } = customerDetail;
     const stringData = `${organisation?.name} ${
       receiptNo || 1 + "-" + firstName
-    } ${lastName + "-total-" + amountDue}`;
+    } ${lastName + "-total-" + amountPaid.toFixed(2)}`;
     const QrCode = await generateQRCode(stringData);
 
     const receiptDate = new Date();
@@ -180,7 +180,7 @@ const updateProducts = async (summary, sale_id, salesPerson) => {
         }
 
         if (product.type === "Collective Product" && product.quantity === 0) {
-          const status = { status: "sold - out of stock" };
+          const status = { status: "out of stock" };
           const updateProductCode = await TagModel.findOneAndUpdate(
             {
               productCode: product.productCode,
@@ -320,6 +320,25 @@ const getAllSales = async (req, res) => {
       .equals(status)
       .lean();
     return res.status(200).send(sales);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const getAllDeletedInvoiceAndReceipt = async (req, res) => {
+  try {
+    const organisationId = req.query.organisationId;
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+    const invoices = await InvoiceModel.find({ organisationId })
+      .where("status")
+      .equals("disabled")
+      .lean();
+    const receipts = await ReceiptModel.find({ organisationId })
+      .where("status")
+      .equals("disabled")
+      .lean();
+    const collection = [...invoices, ...receipts];
+    return res.status(200).send(collection);
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -711,6 +730,41 @@ const deleteComment = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+
+const checkPayment = async (_id, amountPaid) => {
+  if (amountPaid > 0) return true;
+  const invoice = await InvoiceModel.findOne({ _id });
+  if (invoice?.linkedReceiptList.length === 0) return true;
+  const { linkedReceiptList } = invoice;
+  if (linkedReceiptList.length === 0) {
+    return false;
+  }
+  let sum = 0;
+  await Promise.all(
+    linkedReceiptList.map(async (receipt) => {
+      const { receiptId } = receipt;
+      const paidRecipt = await ReceiptModel.findOne({ _id: receiptId })
+        .where("status")
+        .equals("active")
+        .lean();
+
+      if (paidRecipt?.linkedInvoiceList?.length > 0) {
+        const { linkedInvoiceList } = paidRecipt;
+        const found = linkedInvoiceList.find(
+          (invoice) => invoice?.invoiceId === _id
+        );
+        if (found) {
+          sum += found.appliedAmount;
+        }
+      }
+    })
+  );
+  if (sum > 0) {
+    return true;
+  }
+  return false;
+};
+
 const deleteSale = async (req, res) => {
   try {
     const { _ids, reason, user } = req.body;
@@ -727,46 +781,103 @@ const deleteSale = async (req, res) => {
       return res.status(400).send("sale_id is required");
     if (!reason) return res.status(400).send("reason is required");
     if (!user?.name) return res.status(400).send("user is required");
-    let invalidSales = [];
-    const validate = _ids.map(async (_id) => {
-      const currentSales = await SaleModel.findById(_id);
-      if (!currentSales) invalidSales.push(_id);
-      await Promise.all(validate);
-      if (invalidSales?.length > 0)
-        return res
-          .status(400)
-          .send("Error!, cant find sales with ids: " + invalidSales);
-    });
+
+    let inValid = false;
+    await Promise.all(
+      _ids.map(async (sale) => {
+        const { _id, invoiceNo, amountPaid } = sale;
+        if (invoiceNo) {
+          const validate = await checkPayment(_id, amountPaid);
+          if (validate) {
+            inValid = true;
+          }
+        }
+      })
+    );
+    if (inValid) {
+      return res
+        .status(400)
+        .send(
+          "Error: one of the selected invoices for deletion has an active recorded payment applied to it. Hence cannot be deleted"
+        );
+    }
 
     let mutatedSales = [];
-    const mutate = _ids.map(async (_id) => {
-      const updateLog = await SaleModel.findByIdAndUpdate(
+    const mutate = _ids.map(async (sale) => {
+      const {
+        saleId,
         _id,
-        { status: "disabled", $push: { logs: log } },
-        { new: true }
-      );
-      if (!updateLog) mutatedSales.push(_id);
-      let currentInvoice = {};
-      let currentReceipt = {};
-      if (updateLog?.paymentMethod === "invoice") {
-        currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
-        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
-          { _id: currentInvoice?._id },
+        customerId,
+        amountPaid,
+        amountDue,
+        invoiceNo,
+        receiptNo,
+      } = sale;
+
+      if (saleId) {
+        const updateLog = await SaleModel.findByIdAndUpdate(
+          { _id: saleId },
           { status: "disabled", $push: { logs: log } },
+          { new: true }
+        );
+      }
+      if (invoiceNo) {
+        const invoiceLog = {
+          date: new Date(),
+          user: user?.name,
+          action: "delete",
+          reason: reason,
+          details: `deleted invoice ${invoiceNo} with amount - : ${amountDue}`,
+        };
+        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+          _id,
+          { status: "disabled", $push: { logs: invoiceLog } },
           { new: true }
         );
         if (!updateIvoiceLog) {
-          mutatedSales.push(currentInvoice?._id);
+          mutatedSales.push(updateIvoiceLog?._id);
+        }
+        if (customerId) {
+          const updateCustomer =
+            await OrganisationContactModel.findByIdAndUpdate(
+              { _id: customerId },
+              { $push: { logs: invoiceLog } },
+              { new: true }
+            );
+          if (!updateCustomer) {
+            return res
+              .status(400)
+              .send("payment successful but couldnt update customer");
+          }
         }
       } else {
-        currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+        const receiptLog = {
+          date: new Date(),
+          user: user?.name,
+          action: "delete",
+          reason: reason,
+          details: `restored payment - ${receiptNo} with amount : ${amountPaid}`,
+        };
         const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
-          { _id: currentReceipt._id },
-          { status: "disabled", $push: { logs: log } },
+          _id,
+          { status: "disabled", $push: { logs: receiptLog } },
           { new: true }
         );
         if (!updateReceiptLog) {
-          mutatedSales.push(currentReceipt?._id);
+          mutatedSales.push(updateReceiptLog?._id);
+        }
+        if (customerId) {
+          const updateCustomer =
+            await OrganisationContactModel.findByIdAndUpdate(
+              { _id: customerId },
+              { $push: { logs: receiptLog } },
+              { new: true }
+            );
+          if (!updateCustomer) {
+            return res
+              .status(400)
+              .send("payment successful but couldnt update customer");
+          }
         }
       }
     });
@@ -795,46 +906,82 @@ const restoreSale = async (req, res) => {
       return res.status(400).send("sale_id is required");
     if (!reason) return res.status(400).send("reason is required");
     if (!user?.name) return res.status(400).send("user is required");
-    let invalidSales = [];
-    const validate = _ids.map(async (_id) => {
-      const currentSales = await SaleModel.findById(_id);
-      if (!currentSales) invalidSales.push(_id);
-      await Promise.all(validate);
-      if (invalidSales?.length > 0)
-        return res
-          .status(400)
-          .send("Error!, cant find sales with ids: " + invalidSales);
-    });
 
     let mutatedSales = [];
-    const mutate = _ids.map(async (_id) => {
-      const updateLog = await SaleModel.findByIdAndUpdate(
+    const mutate = _ids.map(async (sale) => {
+      const {
+        saleId,
         _id,
-        { status: "active", $push: { logs: log } },
-        { new: true }
-      );
-      if (!updateLog) mutatedSales.push(_id);
-      let currentInvoice = {};
-      let currentReceipt = {};
-      if (updateLog?.paymentMethod === "invoice") {
-        currentInvoice = await InvoiceModel.findOne({ sale_id: _id });
-        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
-          { _id: currentInvoice?._id },
+        customerId,
+        amountPaid,
+        amountDue,
+        invoiceNo,
+        receiptNo,
+      } = sale;
+      if (saleId) {
+        const updateLog = await SaleModel.findByIdAndUpdate(
+          { _id: saleId },
           { status: "active", $push: { logs: log } },
+          { new: true }
+        );
+      }
+      if (invoiceNo) {
+        const invoiceLog = {
+          date: new Date(),
+          user: user?.name,
+          action: "restore",
+          reason: reason,
+          details: `restored invoice ${invoiceNo} with amount - : ${amountDue}`,
+        };
+        const updateIvoiceLog = await InvoiceModel.findByIdAndUpdate(
+          _id,
+          { status: "active", $push: { logs: invoiceLog } },
           { new: true }
         );
         if (!updateIvoiceLog) {
-          mutatedSales.push(currentInvoice?._id);
+          mutatedSales.push(updateIvoiceLog?._id);
+        }
+        if (customerId) {
+          const updateCustomer =
+            await OrganisationContactModel.findByIdAndUpdate(
+              { _id: customerId },
+              { $push: { logs: invoiceLog } },
+              { new: true }
+            );
+          if (!updateCustomer) {
+            return res
+              .status(400)
+              .send("payment successful but couldnt update customer");
+          }
         }
       } else {
-        currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
+        const receiptLog = {
+          date: new Date(),
+          user: user?.name,
+          action: "restore",
+          reason: reason,
+          details: `restored payment - ${receiptNo} with amount : ${amountPaid}`,
+        };
         const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
-          { _id: currentReceipt._id },
-          { status: "active", $push: { logs: log } },
+          _id,
+          { status: "active", $push: { logs: receiptLog } },
           { new: true }
         );
         if (!updateReceiptLog) {
-          mutatedSales.push(currentReceipt?._id);
+          mutatedSales.push(updateReceiptLog?._id);
+        }
+        if (customerId) {
+          const updateCustomer =
+            await OrganisationContactModel.findByIdAndUpdate(
+              { _id: customerId },
+              { $push: { logs: receiptLog } },
+              { new: true }
+            );
+          if (!updateCustomer) {
+            return res
+              .status(400)
+              .send("payment successful but couldnt update customer");
+          }
         }
       }
     });
@@ -857,4 +1004,5 @@ module.exports = {
   addComment,
   deleteComment,
   restoreSale,
+  getAllDeletedInvoiceAndReceipt,
 };

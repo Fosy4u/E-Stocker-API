@@ -1,5 +1,75 @@
 const InvoiceModel = require("../models/invoice");
 const SaleModel = require("../models/sales");
+const ReceiptModel = require("../models/receipt");
+const OrganisationContactModel = require("../models/organisationContact");
+
+const calcAmountPaid = async (linkedReceiptList, _id) => {
+  let amountpaid = 0;
+  if (linkedReceiptList.length === 0) {
+    return amountpaid;
+  }
+
+  await Promise.all(
+    linkedReceiptList.map(async (receipt) => {
+      const payment = await ReceiptModel.findById({
+        _id: receipt?.receiptId,
+      })
+        .where("status")
+        .equals("active")
+        .lean();
+      if (payment?._id) {
+        const found = payment?.linkedInvoiceList.find(
+          (invoice) => invoice?.invoiceId === _id.toString()
+        );
+        if (found) {
+          amountpaid += Number(found.appliedAmount);
+        }
+      }
+    })
+  );
+  return amountpaid;
+};
+
+const checkAmountPaid = async (invoices) => {
+  let collection = [];
+  await Promise.all(
+    invoices.map(async (invoice) => {
+      const newInvoice = { ...invoice };
+      const { linkedReceiptList, _id, amountDue } = newInvoice;
+      let amountPaid = 0;
+      if (linkedReceiptList?.length > 0) {
+        amountPaid = await calcAmountPaid(linkedReceiptList, _id);
+      }
+
+      newInvoice.amountPaid = Number(amountPaid);
+      newInvoice.balance = Number(Number(amountDue) - Number(amountPaid));
+      collection.push(newInvoice);
+    })
+  );
+  return collection;
+};
+const addCustomerDetail = async (invoice) => {
+  const { customerId } = invoice;
+  const customer = await OrganisationContactModel.findById({ _id: customerId })
+    .where("status")
+    .equals("active")
+    .lean();
+  if (customer?._id) {
+    const newcustomer = { ...customer };
+    const { firstName, lastName, email, phoneNumber, address, salutation } =
+      newcustomer || {};
+    invoice.customerDetail = {
+      firstName,
+      lastName,
+      email,
+      phoneNumber,
+      address,
+      salutation,
+    };
+    return invoice;
+  }
+  return invoice;
+};
 
 const getAllInvoice = async (req, res) => {
   try {
@@ -12,7 +82,16 @@ const getAllInvoice = async (req, res) => {
       .where("status")
       .equals(status)
       .lean();
-    return res.status(200).send(invoices);
+    if (!invoices) return res.status(200).send([]);
+    const invoicesWithBalance = await checkAmountPaid(invoices);
+    let addedCustomerDetails = [];
+    await Promise.all(
+      invoicesWithBalance.map(async (invoice) => {
+        const addCustomer = await addCustomerDetail(invoice);
+        addedCustomerDetails.push(addCustomer);
+      })
+    );
+    return res.status(200).send(addedCustomerDetails);
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -27,7 +106,17 @@ const getInvoice = async (req, res) => {
       .equals(status)
       .lean();
     if (!invoice) return res.status(200).send({});
-    return res.status(200).send(invoice);
+    const newInvoice = { ...invoice };
+    const { linkedReceiptList, _id } = newInvoice;
+    let amountPaid = 0;
+    if (linkedReceiptList?.length > 0) {
+      amountPaid = await calcAmountPaid(linkedReceiptList, _id);
+    }
+    newInvoice.amountPaid = Number(amountPaid);
+    newInvoice.balance = Number(newInvoice.amountDue) - Number(amountPaid);
+    const addedCustomerDetail = await addCustomerDetail(newInvoice);
+    console.log(addedCustomerDetail);
+    return res.status(200).send(addedCustomerDetail);
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -49,50 +138,79 @@ const getInvoiceByParam = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
-const calcBalance = (amountDue, paymentList) => {
-  console.log("came here");
-  let balance = amountDue;
-  if (paymentList.length === 0) {
-    return balance;
-  }
-  paymentList.forEach((payment) => {
-    balance -= payment.amountPaid;
-  });
-  return balance;
-};
 
-const checkOutstanding = (invoices) => {
-  console.log(
-    "🚀 ~ file: invoice.js ~ line 61 ~ checkOutstanding ~ invoices",
-    invoices?.length
-  );
-  let outstanding = [];
-  invoices?.forEach((invoice) => {
-    const { amountDue, paymentList } = invoice;
-    const balance = calcBalance(amountDue, paymentList || []);
-    if (balance > 0) {
-      outstanding.push(invoice);
-    }
-  });
-  return outstanding;
-};
-
-const getCustomerInvoice = async (req, res) => {
+const getInvoiceReceipts = async (req, res) => {
   try {
-    const { customerId, outstanding } = req.query;
-
-    const organisationId = req.query.organisationId;
-    if (!organisationId)
-      return res.status(400).send("organisationId is required");
-    if (!customerId) return res.status(400).send("customerId is required");
-    const invoice = await InvoiceModel.find({ customerId, organisationId })
+    const { _id } = req.query;
+    if (!_id) return res.status(400).send("_id is required");
+    const invoice = await InvoiceModel.findOne({
+      _id,
+      linkedReceiptList: { $exists: true },
+    })
       .where("status")
       .equals("active")
       .lean();
     if (!invoice) return res.status(200).send([]);
+
+    const { linkedReceiptList } = invoice;
+    if (linkedReceiptList?.length === 0) return res.status(200).send([]);
+    // if (!linkedReceiptList) return res.status(200).send([]);
+    console.log("ready to get receipts");
+    const collectReceipts = [];
+    await Promise.all(
+      linkedReceiptList.map(async (receipt) => {
+        const receiptData = await ReceiptModel.findById({
+          _id: receipt?.receiptId,
+        })
+          .where("status")
+          .equals("active")
+          .lean();
+        if (receiptData?._id) {
+          console.log("receipt found");
+          collectReceipts.push(receiptData);
+        }
+      })
+    );
+    console.log("receipts found", collectReceipts.length);
+    return res.status(200).send(collectReceipts);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const getCustomerInvoice = async (req, res) => {
+  try {
+    const { customerId, outstanding } = req.query;
+    const organisationId = req.query.organisationId;
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+    if (!customerId) return res.status(400).send("customerId is required");
+    const invoice = await InvoiceModel.find({
+      customerId,
+      organisationId,
+      stage: { $eq: "sent" },
+      status: { $eq: "active" },
+    }).lean();
+    if (!invoice) return res.status(200).send([]);
     if (!outstanding) return res.status(200).send(invoice);
-    const outstandingInvoice = checkOutstanding(invoice);
-    return res.status(200).send(outstandingInvoice);
+
+    let collection = [];
+    await Promise.all(
+      invoice.map(async (invoice) => {
+        const newInvoice = { ...invoice };
+        const { linkedReceiptList, _id, amountDue } = newInvoice;
+        let amountPaid = 0;
+        if (linkedReceiptList?.length > 0) {
+          amountPaid = await calcAmountPaid(linkedReceiptList, _id);
+        }
+        newInvoice.amountPaid = Number(amountPaid);
+        newInvoice.balance = Number(Number(amountDue) - Number(amountPaid));
+        if (newInvoice.balance > 0) {
+          collection.push(newInvoice);
+        }
+      })
+    );
+
+    return res.status(200).send(collection);
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -222,4 +340,5 @@ module.exports = {
   getInvoiceByParam,
   stampInvoice,
   getCustomerInvoice,
+  getInvoiceReceipts,
 };
