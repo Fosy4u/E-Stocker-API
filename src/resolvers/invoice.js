@@ -17,9 +17,10 @@ const calcAmountPaid = async (linkedReceiptList, _id) => {
         .where("status")
         .equals("active")
         .lean();
+      console.log("paymentId", receipt?.paymentId);
       if (payment?._id) {
         const found = payment?.linkedInvoiceList.find(
-          (invoice) => invoice?.invoiceId === _id.toString()
+          (pay) => pay?._id.toString() === receipt?.paymentId
         );
         if (found) {
           amountpaid += Number(found.appliedAmount);
@@ -115,7 +116,6 @@ const getInvoice = async (req, res) => {
     newInvoice.amountPaid = Number(amountPaid);
     newInvoice.balance = Number(newInvoice.amountDue) - Number(amountPaid);
     const addedCustomerDetail = await addCustomerDetail(newInvoice);
-    console.log(addedCustomerDetail);
     return res.status(200).send(addedCustomerDetail);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -155,23 +155,25 @@ const getInvoiceReceipts = async (req, res) => {
     const { linkedReceiptList } = invoice;
     if (linkedReceiptList?.length === 0) return res.status(200).send([]);
     // if (!linkedReceiptList) return res.status(200).send([]);
-    console.log("ready to get receipts");
+
     const collectReceipts = [];
     await Promise.all(
       linkedReceiptList.map(async (receipt) => {
-        const receiptData = await ReceiptModel.findById({
-          _id: receipt?.receiptId,
-        })
-          .where("status")
-          .equals("active")
-          .lean();
-        if (receiptData?._id) {
-          console.log("receipt found");
-          collectReceipts.push(receiptData);
+        const { paymentId, receiptId } = receipt;
+        if (receiptId && paymentId) {
+          const receiptData = await ReceiptModel.findById({
+            _id: receipt?.receiptId,
+          })
+            .where("status")
+            .equals("active")
+            .lean();
+          if (receiptData?._id) {
+            collectReceipts.push(receiptData);
+          }
         }
       })
     );
-    console.log("receipts found", collectReceipts.length);
+
     return res.status(200).send(collectReceipts);
   } catch (error) {
     return res.status(500).send(error.message);

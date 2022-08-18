@@ -44,7 +44,7 @@ const verifyAutoInvoiceNo = async (organisationId, autoGenerator) => {
     const invoiceNo = invoicePrefix + nextAutoInvoiceNo;
     const exist = await InvoiceModel.findOne({ organisationId, invoiceNo });
     if (!exist) {
-      console.log("not exist", invoiceNo);
+    
       const update = await AutoGeneratorModel.findOneAndUpdate(
         { organisationId },
         { ...autoGenerator }
@@ -69,7 +69,7 @@ const verifyAutoReceiptNo = async (organisationId, autoGenerator) => {
     const receiptNo = receiptPrefix + nextAutoReceiptNo;
     const exist = await ReceiptModel.findOne({ organisationId, receiptNo });
     if (!exist) {
-      console.log("not exist", receiptNo);
+     
       const update = await AutoGeneratorModel.findOneAndUpdate(
         { organisationId },
         { ...autoGenerator }

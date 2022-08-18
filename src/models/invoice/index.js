@@ -89,6 +89,7 @@ const InvoiceSchema = new mongoose.Schema(
         {
           receiptId: { type: String, required: true },
           receiptNo: { type: String, required: true },
+          paymentId: { type: String, required: true },
         },
       ],
       required: false,

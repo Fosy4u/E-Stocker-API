@@ -3,6 +3,7 @@ const OrganisationContactModel = require("../models/organisationContact");
 const InvoiceModel = require("../models/invoice");
 const QRCode = require("qrcode");
 const _ = require("mongoose-sequence");
+const { find } = require("../models/receipt");
 
 const calcOverPaymentAmount = (linkedInvoiceList, amountPaid) => {
   let overPaymentAmount = 0;
@@ -188,12 +189,7 @@ const verifyReceipt = async (receipts) => {
     receipts?.map(async (item) => {
       const { _id, linkedInvoice } = item;
 
-      if (
-        !_id ||
-        !linkedInvoice?.invoiceId ||
-        !linkedInvoice?.invoiceNo ||
-        !linkedInvoice?.appliedAmount
-      ) {
+      if (!_id || !linkedInvoice?.invoiceId || !linkedInvoice?.invoiceNo) {
         isValid = false;
         return isValid;
       }
@@ -209,6 +205,7 @@ const verifyReceipt = async (receipts) => {
 
 const updateInvoiceLinkedReceipt = async (req, res) => {
   try {
+    console.log("started here");
     const { receipts, salesPerson, customerId } = req.body;
     if (receipts?.length === 0)
       return res.status(400).send("no receipts provided");
@@ -225,37 +222,59 @@ const updateInvoiceLinkedReceipt = async (req, res) => {
     await Promise.resolve(
       receipts.map(async (receipt) => {
         const { _id, linkedInvoice } = receipt;
-        const updatedReceipt = await ReceiptModel.findByIdAndUpdate(
-          _id,
-          { $push: { linkedInvoiceList: { ...linkedInvoice } } },
-          { new: true }
-        );
-        if (!receipt) {
-          invalidUpdates.push(_id);
-        }
-        if (updatedReceipt) {
-          const { invoiceId, invoiceNo, appliedAmount } = linkedInvoice;
-          const invoiceLog = {
+        if (linkedInvoice?.appliedAmount) {
+          const receiptLog = {
             date: new Date(),
             user: salesPerson?.name,
             userId: salesPerson?.id,
             action: "payment",
-            details: `added ${appliedAmount} from ${updatedReceipt?.receiptNo}`,
-            reason:
-              `applied unused payment receieved from ` +
-              updatedReceipt?.receiptNo,
+            details: `applied ${linkedInvoice?.appliedAmount} to ${linkedInvoice?.invoiceNo}`,
+            reason: `applied unused payment in the receipt`,
           };
-          const linkedReceipt = {
-            receiptId: updatedReceipt?._id,
-            receiptNo: updatedReceipt?.receiptNo,
-          };
-          await InvoiceModel.findByIdAndUpdate(
-            invoiceId,
+          const updatedReceipt = await ReceiptModel.findByIdAndUpdate(
+            _id,
             {
-              $push: { logs: invoiceLog, linkedReceiptList: linkedReceipt },
+              $push: {
+                linkedInvoiceList: { ...linkedInvoice },
+                logs: receiptLog,
+              },
             },
             { new: true }
           );
+          if (!updatedReceipt || !updatedReceipt?._id) {
+            invalidUpdates.push(_id);
+          }
+
+          if (updatedReceipt) {
+            const { invoiceId, invoiceNo, appliedAmount, _id } = linkedInvoice;
+            const invoiceLog = {
+              date: new Date(),
+              user: salesPerson?.name,
+              userId: salesPerson?.id,
+              action: "payment",
+              details: `added ${appliedAmount} from ${updatedReceipt?.receiptNo}`,
+              reason:
+                `applied unused payment receieved from ` +
+                updatedReceipt?.receiptNo,
+            };
+            const linkedInvoiceLength =
+              updatedReceipt?.linkedInvoiceList?.length;
+            const paymentId =
+              updatedReceipt?.linkedInvoiceList?.[linkedInvoiceLength - 1]?._id;
+
+            const linkedReceipt = {
+              receiptId: updatedReceipt?._id,
+              receiptNo: updatedReceipt?.receiptNo,
+              paymentId,
+            };
+            await InvoiceModel.findByIdAndUpdate(
+              invoiceId,
+              {
+                $push: { logs: invoiceLog, linkedReceiptList: linkedReceipt },
+              },
+              { new: true }
+            );
+          }
         }
       })
     );
@@ -470,7 +489,7 @@ const createInvoiceLinkedPayment = async (req, res) => {
         reason:
           `applied payment receieved via ` + paymentMethod + ` to invoice(s)`,
       };
-      console.log("comlpete", receipt);
+
       const updateCustomer = await OrganisationContactModel.findByIdAndUpdate(
         { _id: customerId },
         { $push: { logs: log } },
@@ -480,20 +499,34 @@ const createInvoiceLinkedPayment = async (req, res) => {
       await Promise.resolve(
         linkedInvoiceList.forEach(async (invoice) => {
           const { invoiceId } = invoice;
+          const payment = receipt.linkedInvoiceList?.find(
+            (invoice) => invoice?.invoiceId === invoiceId
+          );
           const linkedInv = {
             receiptId: receipt._id,
             receiptNo: receipt.receiptNo,
+            paymentId: payment?._id,
+          };
+          const invoiceLog = {
+            date: new Date(),
+            user: salesPerson?.name,
+            userId: salesPerson?.id,
+            action: "payment",
+            details: ` applied ${payment?.appliedAmount} to this invoice from the total payment of ${amountPaid}  in ${receiptNo}`,
+            reason:
+              `applied payment receieved via ` +
+              paymentMethod +
+              ` to invoice(s)`,
           };
 
           const updateIvoice = await InvoiceModel.findByIdAndUpdate(
             { _id: invoiceId },
-            { $push: { linkedReceiptList: linkedInv, logs: log } },
+            { $push: { linkedReceiptList: linkedInv, logs: invoiceLog } },
             { new: true }
           );
           if (!updateIvoice) {
             return res.status(400).send("payment failed");
           }
-          console.log("done", updateIvoice);
         })
       );
 
