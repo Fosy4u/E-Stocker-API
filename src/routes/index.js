@@ -185,6 +185,11 @@ let routes = (app) => {
     authMiddleware,
     receiptResolver.getAllCustomerOverPayment
   );
+  router.get(
+    "/receipt/linkedInvoices",
+    authMiddleware,
+    receiptResolver.getReceiptLinkedInvoices
+  );
   router.put(
     "/receipt/validate/receiptno",
     authMiddleware,
@@ -195,7 +200,12 @@ let routes = (app) => {
     authMiddleware,
     receiptResolver.createInvoiceLinkedPayment
   );
-  router.post(
+  router.put(
+    "/receipt/edit/invoiceLinkedPayment",
+    authMiddleware,
+    receiptResolver.editInvoiceLinkedPayment
+  );
+  router.put(
     "/receipt/update/invoiceLinkedPayment",
     authMiddleware,
     receiptResolver.updateInvoiceLinkedReceipt

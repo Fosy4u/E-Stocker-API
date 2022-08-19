@@ -168,6 +168,93 @@ const getReceipt = async (req, res) => {
   }
 };
 
+const calcAmountPaid = async (linkedReceiptList, _id) => {
+  let amountpaid = 0;
+  if (linkedReceiptList.length === 0) {
+    return amountpaid;
+  }
+
+  await Promise.all(
+    linkedReceiptList.map(async (receipt) => {
+      const payment = await ReceiptModel.findById({
+        _id: receipt?.receiptId,
+      })
+        .where("status")
+        .equals("active")
+        .lean();
+
+      if (payment?._id) {
+        const found = payment?.linkedInvoiceList.find(
+          (pay) => pay?._id.toString() === receipt?.paymentId
+        );
+        if (found) {
+          amountpaid += Number(found.appliedAmount);
+        }
+      }
+    })
+  );
+  return amountpaid;
+};
+
+const getLinkedInvoiceList = async (linkedInvoiceList) => {
+  return linkedInvoiceList.reduce(async (acc, invoice) => {
+    const collect = await acc;
+    const { invoiceId, appliedAmount } = invoice;
+    if (invoiceId && appliedAmount > 0) {
+      const invoice = await InvoiceModel.findById({ _id: invoiceId })
+        .where("status")
+        .equals("active")
+        .lean();
+      if (invoice) {
+        const newInvoice = { ...invoice };
+        const { linkedReceiptList, _id, amountDue } = newInvoice;
+        const amountPaid = await calcAmountPaid(linkedReceiptList, _id);
+        newInvoice.appliedAmount = appliedAmount;
+        // amounts before applying this receipt
+        newInvoice.amountPaid = Number(amountPaid) - Number(appliedAmount);
+        newInvoice.balance =
+          Number(Number(amountDue) - Number(amountPaid)) +
+          Number(appliedAmount);
+        const found = collect.find((inv) => inv?._id.toString() === invoiceId);
+        if (!found) {
+          collect.push(newInvoice);
+        } else {
+          const newFound = { ...found };
+
+          newFound.appliedAmount =
+            Number(found.appliedAmount) + Number(appliedAmount);
+          newFound.balance = Number(found.balance) + Number(appliedAmount);
+          newFound.amountPaid =
+            Number(found.amountPaid) - Number(appliedAmount);
+          const foundIndex = collect.findIndex(
+            (inv) => inv?._id.toString() === invoiceId
+          );
+          collect[foundIndex] = newFound;
+        }
+      }
+    }
+    return collect;
+  }, []);
+};
+const getReceiptLinkedInvoices = async (req, res) => {
+  try {
+    if (!req.query._id) return res.status(400).send("no receiptId provided");
+    const receipt = await ReceiptModel.findById(req.query._id)
+      .where("status")
+      .equals("active")
+      .lean();
+    if (!receipt) return res.status(200).send({});
+    const newReceipt = { ...receipt };
+    const { linkedInvoiceList } = newReceipt;
+
+    const invoiceList = await getLinkedInvoiceList(linkedInvoiceList);
+
+    return res.status(200).send(invoiceList);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
 const getReceiptByParam = async (req, res) => {
   try {
     const param = req.query;
@@ -177,6 +264,12 @@ const getReceiptByParam = async (req, res) => {
     const receipt = await ReceiptModel.find({ ...param }).lean();
     if (!receipt)
       return res.status(400).send("receipt with matching param not found");
+    const newReceipt = { ...receipt };
+    const { _id, receiptNo, amountPaid, linkedInvoiceList } = newReceipt;
+    const overPayment = calcOverPaymentAmount(linkedInvoiceList, amountPaid);
+    newReceipt.overPayment = overPayment;
+    const addedCustomerReceipt = await addCustomerDetail(newReceipt);
+    return res.status(200).send(addedCustomerReceipt);
     return res.status(200).send(receipt);
   } catch (error) {
     return res.status(500).send(error.message);
@@ -205,7 +298,7 @@ const verifyReceipt = async (receipts) => {
 
 const updateInvoiceLinkedReceipt = async (req, res) => {
   try {
-    console.log("started here");
+
     const { receipts, salesPerson, customerId } = req.body;
     if (receipts?.length === 0)
       return res.status(400).send("no receipts provided");
@@ -381,7 +474,7 @@ const generateQRCode = async (stringData) => {
 };
 
 const generateReceipt = async (data) => {
-  console.log("generating receipt");
+
   try {
     const {
       organisationId,
@@ -411,7 +504,7 @@ const generateReceipt = async (data) => {
 };
 
 const createInvoiceLinkedPayment = async (req, res) => {
-  console.log("started");
+
   try {
     const {
       organisationId,
@@ -507,6 +600,23 @@ const createInvoiceLinkedPayment = async (req, res) => {
             receiptNo: receipt.receiptNo,
             paymentId: payment?._id,
           };
+          const receiptLog = {
+            date: new Date(),
+            user: salesPerson?.name,
+            userId: salesPerson?.id,
+            action: "payment",
+            details: ` applied ${payment?.appliedAmount} to ${payment?.invoiceNo}`,
+            reason:
+              `applied payment receieved via ` +
+              paymentMethod +
+              ` to invoice(s)`,
+          };
+          const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
+            { _id: receipt._id },
+            { $push: { logs: receiptLog } },
+            { new: true }
+          );
+
           const invoiceLog = {
             date: new Date(),
             user: salesPerson?.name,
@@ -538,6 +648,258 @@ const createInvoiceLinkedPayment = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+const editInvoiceLinkedPayment = async (req, res) => {
+  try {
+    const {
+      organisationId,
+      paymentMethod,
+      salesPerson,
+      amountPaid,
+      receiptDate,
+      customerId,
+      branch,
+      receiptNo,
+      linkedInvoiceList,
+      reason,
+    } = req.body;
+
+    if (!organisationId)
+      return res.status(400).send("organisationId is required");
+    if (!paymentMethod)
+      return res.status(400).send("paymentMethod is required");
+    if (!reason)
+      return res.status(400).send("reason for modification is required");
+    if (!salesPerson) return res.status(400).send("salesPerson is required");
+    if (!amountPaid || amountPaid <= 0)
+      return res.status(400).send("amountPaid is required");
+    if (!receiptDate) return res.status(400).send("receiptDate is required");
+    if (!customerId) return res.status(400).send("customerId is required");
+    if (!branch) return res.status(400).send("branch is required");
+    if (!receiptNo) return res.status(400).send("receiptNo is required");
+    if (!linkedInvoiceList || linkedInvoiceList.length === 0)
+      return res.status(400).send("linkedInvoiceList is required");
+    const isValid = true;
+
+    linkedInvoiceList.forEach((invoice) => {
+      const { invoiceId, invoiceNo, appliedAmount } = invoice;
+      if (!invoiceId || !invoiceNo || !appliedAmount) {
+        isValid = false;
+      }
+    });
+    if (!isValid) {
+      return res.status(400).send("linkedInvoice list validation failed");
+    }
+    const currentReceipt = await ReceiptModel.findOne({ receiptNo });
+    if (!currentReceipt) {
+      return res.status(400).send("receipt to be updated not found");
+    }
+    const overPayment = calcOverPayment(linkedInvoiceList, amountPaid);
+    const difference = [];
+    if (amountPaid && amountPaid !== currentReceipt?.amountPaid) {
+      difference.push({
+        field: "amount paid",
+        old: currentReceipt?.amountPaid,
+        new: amountPaid,
+      });
+    }
+    if (receiptDate && receiptDate !== currentReceipt?.receiptDate) {
+      difference.push({
+        field: "payment date",
+        old: currentReceipt?.receiptDate,
+        new: receiptDate,
+      });
+    }
+    if (overPayment !== currentReceipt?.overPayment) {
+      difference.push({
+        field: "unused amount / over payment",
+        old: currentReceipt?.overPayment,
+        new: overPayment,
+      });
+    }
+
+    await Promise.resolve(
+      linkedInvoiceList.forEach(async (invoice) => {
+        const { invoiceId, invoiceNo, appliedAmount } = invoice;
+        const payment = currentReceipt.linkedInvoiceList?.filter(
+          (invoice) => invoice?.invoiceId === invoiceId
+        );
+        let sum = 0;
+        payment.forEach((payment) => {
+          sum += payment.appliedAmount;
+        });
+        if (
+          payment &&
+          Number(payment?.appliedAmount).toFixed(2) -
+            Number(appliedAmount).toFixed(2) !==
+            0
+        ) {
+          difference.push({
+            field: "total amount currently applied to " + invoiceNo,
+            old: Number(sum).toFixed(2),
+            new: Number(appliedAmount).toFixed(2),
+          });
+        }
+        if (!payment) {
+          difference.push({
+            field: "amount applied to " + invoiceNo,
+            old: 0,
+            new: Number(appliedAmount).toFixed(2),
+          });
+        }
+      })
+    );
+    if (difference.length === 0) {
+      return res.status(200).send({ message: "no changes to update" });
+    }
+    const log = [
+      {
+        date: new Date(),
+        user: salesPerson?.name,
+        userId: salesPerson?.id,
+        action: "edit",
+        details: `modified ${receiptNo}`,
+        reason: reason,
+        difference: difference,
+      },
+    ];
+
+    const subTotal = amountPaid;
+
+    if (paymentMethod !== "invoice") {
+      const updatedReceipt = await ReceiptModel.findByIdAndUpdate(
+        { _id: currentReceipt._id },
+        {
+          amountPaid,
+          receiptDate,
+          overPayment,
+          linkedInvoiceList,
+          subTotal,
+          branch,
+          $push: { logs: log },
+        },
+        { new: true }
+      );
+      if (!updatedReceipt) {
+        return res.status(400).send("updating receipt failed");
+      }
+
+      const updateCustomer = await OrganisationContactModel.findByIdAndUpdate(
+        { _id: customerId },
+        { $push: { logs: log } },
+        { new: true }
+      );
+      const failedlist = [];
+      await Promise.resolve(
+        linkedInvoiceList.forEach(async (invoice) => {
+          const { invoiceId } = invoice;
+          const exist = currentReceipt.linkedInvoiceList?.find(
+            (invoice) => invoice?.invoiceId === invoiceId
+          );
+          if (exist) {
+            const newPayment = updatedReceipt.linkedInvoiceList?.find(
+              (invoice) => invoice?.invoiceId === invoiceId
+            );
+
+            const { _id } = newPayment;
+
+            const linkedInv = {
+              receiptId: updatedReceipt._id,
+              receiptNo: updatedReceipt.receiptNo,
+              paymentId: _id,
+            };
+           
+            const invoiceDifference = difference.find(
+              (diff) =>
+                diff.field ===
+                "total amount currently applied to " + invoice.invoiceNo
+            );
+            const newDifference = { ...invoiceDifference };
+            newDifference.field =
+              "total amount applied currently from " + linkedInv?.receiptNo;
+            const invoiceLog = {
+              date: new Date(),
+              user: salesPerson?.name,
+              userId: salesPerson?.id,
+              action: "edit",
+              details: ` modified applied payments so far from ${receiptNo}`,
+              reason: reason,
+              difference: [newDifference],
+            };
+
+            const currentInvoice = await InvoiceModel.findById({
+              _id: invoiceId,
+            })
+              .where("status")
+              .equals("active")
+              .lean();
+            if (!currentInvoice) {
+              failedlist.push(invoiceId);
+            }
+            const { linkedReceiptList } = currentInvoice;
+            const newLinkedReceiptList = [...linkedReceiptList];
+            const filtered = newLinkedReceiptList.filter(
+              (invoice) => invoice?.receiptId.toString() !== updatedReceipt._id.toString()
+            );
+           
+            const linkedReceipts = [...filtered, linkedInv];
+            const updateInvoiceLinkedReceipt =
+              await InvoiceModel.findByIdAndUpdate(
+                { _id: invoiceId },
+                {
+                  $push: { logs: invoiceLog },
+                  linkedReceiptList: linkedReceipts,
+                },
+                { new: true }
+              );
+            if (!updateInvoiceLinkedReceipt) {
+              failedlist.push(invoiceId);
+            }
+          }
+
+          if (!exist) {
+            const newPayment = updatedReceipt.linkedInvoiceList?.find(
+              (invoice) => invoice?.invoiceId === invoiceId
+            );
+            const linkedInv = {
+              receiptId: updatedReceipt._id,
+              receiptNo: updatedReceipt.receiptNo,
+              paymentId: newPayment?._id,
+            };
+
+            const invoiceLog = {
+              date: new Date(),
+              user: salesPerson?.name,
+              userId: salesPerson?.id,
+              action: "payment",
+              details: ` applied ${newPayment?.appliedAmount} to this invoice from the total payment of ${amountPaid}  in ${receiptNo}`,
+              reason:
+                `applied payment receieved via ` +
+                paymentMethod +
+                ` to invoice(s)`,
+            };
+
+            const updateIvoice = await InvoiceModel.findByIdAndUpdate(
+              { _id: invoiceId },
+              { $push: { linkedReceiptList: linkedInv, logs: invoiceLog } },
+              { new: true }
+            );
+            if (!updateIvoice) {
+              failedlist.push(invoiceId);
+            }
+          }
+        })
+      );
+      if (failedlist.length > 0) {
+        return res.status(400).send(failedlist);
+      }
+      return res.status(200).send(updatedReceipt);
+    }
+
+    res.status(400).send("wrong payment method");
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
 
 module.exports = {
   getAllReceipt,
@@ -550,4 +912,6 @@ module.exports = {
   createInvoiceLinkedPayment,
   updateInvoiceLinkedReceipt,
   getAllCustomerOverPayment,
+  getReceiptLinkedInvoices,
+  editInvoiceLinkedPayment,
 };
