@@ -35,6 +35,7 @@ const calcSumCustomerOverPaymentAmount = (receipts) => {
 
 const addCustomerDetail = async (invoice) => {
   const { customerId } = invoice;
+  if (!customerId) return invoice;
   const customer = await OrganisationContactModel.findById({ _id: customerId })
     .where("status")
     .equals("active")
@@ -298,7 +299,6 @@ const verifyReceipt = async (receipts) => {
 
 const updateInvoiceLinkedReceipt = async (req, res) => {
   try {
-
     const { receipts, salesPerson, customerId } = req.body;
     if (receipts?.length === 0)
       return res.status(400).send("no receipts provided");
@@ -474,7 +474,6 @@ const generateQRCode = async (stringData) => {
 };
 
 const generateReceipt = async (data) => {
-
   try {
     const {
       organisationId,
@@ -504,7 +503,6 @@ const generateReceipt = async (data) => {
 };
 
 const createInvoiceLinkedPayment = async (req, res) => {
-
   try {
     const {
       organisationId,
@@ -727,11 +725,11 @@ const editInvoiceLinkedPayment = async (req, res) => {
         payment.forEach((payment) => {
           sum += payment.appliedAmount;
         });
+        const substract =
+          Number(sum).toFixed(2) - Number(appliedAmount).toFixed(2);
         if (
-          payment &&
-          Number(payment?.appliedAmount).toFixed(2) -
-            Number(appliedAmount).toFixed(2) !==
-            0
+          substract !== 0 ||
+          Number(sum).toFixed(2) !== Number(appliedAmount).toFixed(2)
         ) {
           difference.push({
             field: "total amount currently applied to " + invoiceNo,
@@ -807,7 +805,7 @@ const editInvoiceLinkedPayment = async (req, res) => {
               receiptNo: updatedReceipt.receiptNo,
               paymentId: _id,
             };
-           
+
             const invoiceDifference = difference.find(
               (diff) =>
                 diff.field ===
@@ -838,9 +836,10 @@ const editInvoiceLinkedPayment = async (req, res) => {
             const { linkedReceiptList } = currentInvoice;
             const newLinkedReceiptList = [...linkedReceiptList];
             const filtered = newLinkedReceiptList.filter(
-              (invoice) => invoice?.receiptId.toString() !== updatedReceipt._id.toString()
+              (invoice) =>
+                invoice?.receiptId.toString() !== updatedReceipt._id.toString()
             );
-           
+
             const linkedReceipts = [...filtered, linkedInv];
             const updateInvoiceLinkedReceipt =
               await InvoiceModel.findByIdAndUpdate(

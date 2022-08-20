@@ -67,7 +67,7 @@ const ReceiptSchema = new mongoose.Schema(
       firstName: { type: String, required: false },
       lastName: { type: String, required: false },
       email: { type: String, required: false },
-      phoneNumber: { type: String, required: false },
+      phoneNo: { type: String, required: false },
       address: { type: String, required: false },
       salutation: { type: String, required: false },
     },

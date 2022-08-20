@@ -96,7 +96,7 @@ const generateReceipt = async (data, sale_id) => {
     const { firstName, lastName } = customerDetail;
     const stringData = `${organisation?.name} ${
       receiptNo || 1 + "-" + firstName
-    } ${lastName + "-total-" + amountPaid.toFixed(2)}`;
+    } ${lastName + "-total-" + Number(amountPaid).toFixed(2)}`;
     const QrCode = await generateQRCode(stringData);
 
     const receiptDate = new Date();
@@ -364,7 +364,11 @@ const editSale = async (req, res) => {
       totalSellingPrice,
       paymentMethod,
       user,
+      receiptDate,
+      balance,
       reason,
+      amountPaid,
+      bankTransactionReference,
     } = req.body;
 
     if (!_id) return res.status(400).send("sale_id is required");
@@ -386,7 +390,7 @@ const editSale = async (req, res) => {
           " Error! can't verify index of selected products for sale. Please check the product index and ensure they are unique"
         );
     }
-    console.log("_id", _id);
+
     const currentSales = await SaleModel.findById(_id);
     if (!currentSales) return res.status(400).send("Error!, sale not found");
     let currentInvoice = {};
@@ -397,6 +401,7 @@ const editSale = async (req, res) => {
     if (paymentMethod === "receipt") {
       currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
     }
+    console.log("start here 1");
     const difference = [];
     if (
       bankDetails?.bankName &&
@@ -408,7 +413,7 @@ const editSale = async (req, res) => {
         new: bankDetails?.bankName,
       });
     }
-    if (invoiceDate !== "undefined") {
+    if (invoiceDate && invoiceDate !== "undefined") {
       if (
         new Date(invoiceDate)?.setHours(0, 0, 0, 0) !==
         new Date(currentInvoice.invoiceDate)?.setHours(0, 0, 0, 0)
@@ -420,6 +425,24 @@ const editSale = async (req, res) => {
         });
       }
     }
+
+    if (
+      receiptDate &&
+      receiptDate !== "undefined" &&
+      currentReceipt.receiptDate
+    ) {
+      if (
+        new Date(receiptDate)?.setHours(0, 0, 0, 0) !==
+        new Date(currentReceipt.receiptDate)?.setHours(0, 0, 0, 0)
+      ) {
+        difference.push({
+          field: "receipt date",
+          old: displayDate(new Date(currentReceipt?.invoiceDate)),
+          new: displayDate(new Date(receiptDate)),
+        });
+      }
+    }
+
     if (
       branch?.name &&
       currentSales.branch?.name &&
@@ -431,18 +454,31 @@ const editSale = async (req, res) => {
         new: branch?.name,
       });
     }
-    if (
-      dueDate &&
-      new Date(dueDate)?.setHours(0, 0, 0, 0) !==
+
+    if (dueDate && dueDate !== "undefined") {
+      if (
+        new Date(dueDate)?.setHours(0, 0, 0, 0) !==
         new Date(currentSales.dueDate)?.setHours(0, 0, 0, 0)
-    ) {
+      ) {
+        difference.push({
+          field: "due date",
+          old: displayDate(new Date(currentSales?.dueDate)),
+          new: displayDate(new Date(dueDate)),
+        });
+      }
+    }
+
+    if (customerNote && customerNote !== currentSales.customerNote) {
       difference.push({
-        field: "due date",
-        old: displayDate(new Date(currentSales?.dueDate)),
-        new: displayDate(new Date(dueDate)),
+        field: "customer note",
+        old: currentSales?.customerNote,
+        new: customerNote,
       });
     }
-    if (customerNote && customerNote !== currentSales.customerNote) {
+    if (
+      bankTransactionReference &&
+      bankTransactionReference !== currentSales?.bankTransactionReference
+    ) {
       difference.push({
         field: "customer note",
         old: currentSales?.customerNote,
@@ -463,6 +499,20 @@ const editSale = async (req, res) => {
         new: subTotal,
       });
     }
+    if (`${amountPaid}` != currentSales.amountPaid) {
+      difference.push({
+        field: "amount paid",
+        old: currentSales?.amountPaid,
+        new: amountPaid,
+      });
+    }
+    if (`${balance}` != currentSales.balance) {
+      difference.push({
+        field: "balance",
+        old: currentSales?.balance,
+        new: balance,
+      });
+    }
     if (
       customerDetail?.firstName !== currentSales.customerDetail?.firstName ||
       customerDetail?.lastName !== currentSales.customerDetail?.lastName ||
@@ -478,7 +528,7 @@ const editSale = async (req, res) => {
         new: customerDetail?.firstName + " " + customerDetail?.lastName,
       });
     }
-    if (`${amountDue}` != currentSales?.amountDue) {
+    if (amountDue && `${amountDue}` != currentSales?.amountDue) {
       difference.push({
         field: "amount due",
         old: currentSales.amountDue,
@@ -538,8 +588,12 @@ const editSale = async (req, res) => {
       currency,
       totalSellingPrice,
       paymentMethod,
+      amountPaid,
+      balance,
+      receiptDate,
+      bankTransactionReference,
     };
-
+    console.log("reach here 1");
     const sale = await SaleModel.findByIdAndUpdate(
       req.body._id,
       { ...params },
@@ -549,7 +603,7 @@ const editSale = async (req, res) => {
       return res.status(200).send("No changes made to the sale");
     if (!sale && difference?.length > 0)
       return res.status(400).send("Error! could not update sale");
-
+    console.log("reach here 2");
     if (sale.paymentMethod === "invoice") {
       const invoice = await InvoiceModel.findOne({ sale_id: sale._id });
       const updatedInvoice = await InvoiceModel.findByIdAndUpdate(
@@ -578,6 +632,7 @@ const editSale = async (req, res) => {
       }
       return res.status(200).send(updatedInvoice);
     }
+    console.log("reach here 3");
     const updatedReceipt = await ReceiptModel.findOneAndUpdate(
       { sale_id: _id },
       {
@@ -591,7 +646,7 @@ const editSale = async (req, res) => {
         { $push: { logs: log } },
         { new: true }
       );
-      if (!updateIvoiceLog)
+      if (!updateLog)
         return res.status(400).send(" receipt modified but failed to update");
       const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
         updatedReceipt._id,
