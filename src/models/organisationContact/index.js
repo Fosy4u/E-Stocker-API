@@ -3,17 +3,17 @@ const mongoose = require("mongoose");
 const timestamp = require("mongoose-timestamp");
 
 const SocialSchema = new mongoose.Schema({
-    twitter: String,
-    facebook: String,
-    instagram: String,
-    website: String,
-  });
+  twitter: String,
+  facebook: String,
+  instagram: String,
+  website: String,
+});
 
 const OrganisationContactSchema = new mongoose.Schema({
   organisationId: { type: String, required: true },
   contactType: { type: String, required: true },
   salutation: { type: String, required: false },
-  status: { type: String, default:'active' },
+  status: { type: String, default: "active" },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   gender: { type: String, required: false },
@@ -23,9 +23,12 @@ const OrganisationContactSchema = new mongoose.Schema({
   address: { type: String, required: false },
   city: { type: String, required: false },
   country: { type: String, required: false },
-  Region: { type: String, required: false },
-  PostCode: { type: String, required: false },
-  Remark: { type: String, required: false },
+  region: { type: String, required: false },
+  postCode: { type: String, required: false },
+  remarks: {
+    type: [{ userId: String, remark: String, date: String }],
+    required: false,
+  },
   localGovernmentArea: { type: String, required: false },
   createdBy: { type: String, required: true },
   customerType: { type: String, required: false },

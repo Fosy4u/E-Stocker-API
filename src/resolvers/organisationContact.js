@@ -1,5 +1,6 @@
 const OrganisationContactModel = require("../models/organisationContact");
 const SaleModel = require("../models/sales");
+const OrganisationUserModel = require("../models/organisationUsers");
 
 const createOrganisationContact = async (req, res) => {
   const { email, organisationId } = req.body;
@@ -37,6 +38,160 @@ const createOrganisationContact = async (req, res) => {
       );
       return res.status(200).send(newContact);
     }
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
+const addOrganisationContactRemark = async (req, res) => {
+  try {
+    const { _id, remark } = req.body;
+    if (!_id)
+      return res.status(400).send({ message: "contact_id is required" });
+    if (!remark) return res.status(400).send({ message: "empty remark " });
+    const { userId } = remark;
+    if (!userId)
+      return res.status(400).send({ message: "current userId is required " });
+    const contact = await OrganisationContactModel.findById({ _id });
+    if (!contact) return res.status(400).send({ message: "contact not found" });
+    const updateRemark = await OrganisationContactModel.findByIdAndUpdate(
+      {
+        _id,
+      },
+      {
+        $push: {
+          remarks: remark,
+        },
+      },
+      { new: true }
+    );
+    const log = {
+      date: new Date(),
+      userId,
+      action: "remark",
+      reason: "added remark",
+      details: `added remark on customer`,
+    };
+    const updateCustomer = await OrganisationContactModel.findByIdAndUpdate(
+      { _id },
+      { $push: { logs: log } },
+      { new: true }
+    );
+    return res.status(200).send(updateRemark);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const deleteOrganisationContactRemark = async (req, res) => {
+  try {
+    const { customerId, remarkId, userId } = req.body;
+    if (!customerId)
+      return res.status(400).send({ message: "customerId is required" });
+    if (!remarkId)
+      return res.status(400).send({ message: "remarkId is required" });
+    if (!userId)
+      return res.status(400).send({ message: "current userId is required" });
+
+    const contact = await OrganisationContactModel.findById({
+      _id: customerId,
+    });
+    if (!contact) return res.status(400).send({ message: "contact not found" });
+    const updateRemark = await OrganisationContactModel.findByIdAndUpdate(
+      {
+        _id: customerId,
+      },
+      {
+        $pull: {
+          remarks: { _id: remarkId },
+        },
+      },
+      { new: true }
+    );
+    const log = {
+      date: new Date(),
+      userId,
+      action: "delete",
+      reason: "deleted remark",
+      details: `deleted remark on customer`,
+    };
+    const updateCustomer = await OrganisationContactModel.findByIdAndUpdate(
+      { _id: customerId },
+      { $push: { logs: log } },
+      { new: true }
+    );
+
+    return res.status(200).send(updateRemark);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
+const getOrganisationContactRemark = async (req, res) => {
+  try {
+    const { _id } = req.query;
+    if (!_id)
+      return res.status(400).send({ message: "contact_id is required" });
+    const contact = await OrganisationContactModel.findById({ _id })
+      .select("remarks")
+      .lean();
+    const remarks = contact?.remarks;
+
+    if (!remarks || remarks?.length === 0) return res.status(200).send([]);
+    const clonedRemarks = [];
+    const myPromise = remarks.map(async (item) => {
+      const newItem = { ...item };
+      const { userId } = newItem;
+      if (userId) {
+        const user = await OrganisationUserModel.findById({
+          _id: userId,
+        }).lean();
+        if (user) {
+          newItem.user = user;
+        }
+      }
+      clonedRemarks.push(newItem);
+    });
+    await Promise.all(myPromise);
+    return res.status(200).send(
+      clonedRemarks.sort(function (a, b) {
+        return new Date(b?.date) - new Date(a?.date);
+      })
+    );
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+const getOrganisationContactLogs = async (req, res) => {
+  try {
+    const { _id } = req.query;
+    if (!_id)
+      return res.status(400).send({ message: "contact_id is required" });
+    const contact = await OrganisationContactModel.findById({ _id })
+      .select("logs")
+      .lean();
+    const logs = contact?.logs;
+
+    if (!logs || logs?.length === 0) return res.status(200).send([]);
+    const clonedLogs = [];
+    const myPromise = logs.map(async (item) => {
+      const newItem = { ...item };
+      const { userId } = newItem;
+      if (userId) {
+        const user = await OrganisationUserModel.findById({
+          _id: userId,
+        }).lean();
+        if (user) {
+          newItem.user = user;
+        }
+      }
+      clonedLogs.push(newItem);
+    });
+    await Promise.all(myPromise);
+    return res.status(200).send(
+      clonedLogs.sort(function (a, b) {
+        return new Date(b?.date) - new Date(a?.date);
+      })
+    );
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -361,4 +516,8 @@ module.exports = {
   deleteOrganisationContact,
   restoreOrganisationContact,
   getOrganisationCustomerRanking,
+  addOrganisationContactRemark,
+  getOrganisationContactRemark,
+  deleteOrganisationContactRemark,
+  getOrganisationContactLogs,
 };

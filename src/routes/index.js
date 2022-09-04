@@ -271,6 +271,16 @@ let routes = (app) => {
     organisationContactResolver.getOrganisationContact
   );
   router.get(
+    "/organisationContact/ContactRemark",
+    authMiddleware,
+    organisationContactResolver.getOrganisationContactRemark
+  );
+  router.get(
+    "/organisationContact/ContactLogs",
+    authMiddleware,
+    organisationContactResolver.getOrganisationContactLogs
+  );
+  router.get(
     "/organisationContact/CustomerRanking",
     authMiddleware,
     organisationContactResolver.getOrganisationCustomerRanking
@@ -279,6 +289,16 @@ let routes = (app) => {
     "/organisationContact/editContact",
     authMiddleware,
     organisationContactResolver.editOrganisationContact
+  );
+  router.put(
+    "/organisationContact/addRemark",
+    authMiddleware,
+    organisationContactResolver.addOrganisationContactRemark
+  );
+  router.put(
+    "/organisationContact/deleteRemark",
+    authMiddleware,
+    organisationContactResolver.deleteOrganisationContactRemark
   );
   router.put(
     "/organisationContact/deleteContact",
