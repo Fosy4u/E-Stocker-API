@@ -270,6 +270,11 @@ let routes = (app) => {
     authMiddleware,
     organisationContactResolver.getOrganisationContact
   );
+  router.get(
+    "/organisationContact/CustomerRanking",
+    authMiddleware,
+    organisationContactResolver.getOrganisationCustomerRanking
+  );
   router.put(
     "/organisationContact/editContact",
     authMiddleware,

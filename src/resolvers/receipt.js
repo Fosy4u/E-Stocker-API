@@ -262,16 +262,22 @@ const getReceiptByParam = async (req, res) => {
     const organisationId = req.query.organisationId;
     if (!organisationId)
       return res.status(400).send("organisationId is required");
-    const receipt = await ReceiptModel.find({ ...param }).lean();
-    if (!receipt)
-      return res.status(400).send("receipt with matching param not found");
-    const newReceipt = { ...receipt };
-    const { _id, receiptNo, amountPaid, linkedInvoiceList } = newReceipt;
-    const overPayment = calcOverPaymentAmount(linkedInvoiceList, amountPaid);
-    newReceipt.overPayment = overPayment;
-    const addedCustomerReceipt = await addCustomerDetail(newReceipt);
-    return res.status(200).send(addedCustomerReceipt);
-    return res.status(200).send(receipt);
+    const receipts = await ReceiptModel.find({ ...param }).lean();
+
+    const newReceipts = [];
+    const myPromise = receipts.map(async (receipt) => {
+      const newReceipt = { ...receipt };
+      const { _id, receiptNo, amountPaid, linkedInvoiceList } = newReceipt;
+      const overPayment = calcOverPaymentAmount(linkedInvoiceList, amountPaid);
+      newReceipt.overPayment = overPayment;
+      const addedCustomerReceipt = await addCustomerDetail(newReceipt);
+
+      newReceipts.push(addedCustomerReceipt);
+    });
+    await Promise.all(myPromise);
+
+    return res.status(200).send(newReceipts);
+    // return res.status(200).send(receipt);
   } catch (error) {
     return res.status(500).send(error.message);
   }

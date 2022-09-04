@@ -17,7 +17,6 @@ const calcAmountPaid = async (linkedReceiptList, _id) => {
         .where("status")
         .equals("active")
         .lean();
-      console.log("paymentId", receipt?.paymentId);
       if (payment?._id) {
         const found = payment?.linkedInvoiceList.find(
           (pay) => pay?._id.toString() === receipt?.paymentId
@@ -211,8 +210,12 @@ const getCustomerInvoice = async (req, res) => {
         }
       })
     );
+    const customer = await OrganisationContactModel.findById({
+      _id: customerId,
+    }).lean();
+    if (!customer) res.status(400).send("customer not found");
 
-    return res.status(200).send(collection);
+    return res.status(200).send({ customer, invoices: collection });
   } catch (error) {
     return res.status(500).send(error.message);
   }

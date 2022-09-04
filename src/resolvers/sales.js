@@ -83,7 +83,7 @@ const getReceiptNo = async (organisationId, autoGenerator) => {
 };
 
 const generateReceipt = async (data, sale_id) => {
-  console.log("generating receipt");
+
   try {
     const {
       organisationId,
@@ -190,7 +190,7 @@ const updateProducts = async (summary, sale_id, salesPerson) => {
               $set: status,
             }
           );
-          console.log("updated productcode", updateProductCode);
+         
         }
         if (product.type === "Collective Product" && product.quantity > 0) {
           const status = { status: `${product.quantity} in-stock` };
@@ -203,12 +203,12 @@ const updateProducts = async (summary, sale_id, salesPerson) => {
               $set: status,
             }
           );
-          console.log("updated productcode", updateProductCode);
+        
         }
         if (product) {
           updatedProducts += 1;
         }
-        console.log("product updated", updatedProducts);
+  
       }
     );
     await Promise.all(myPromise);
@@ -219,7 +219,7 @@ const updateProducts = async (summary, sale_id, salesPerson) => {
 };
 
 const createSale = async (req, res) => {
-  console.log("started");
+
   try {
     const { organisationId, paymentMethod, summary, salesPerson } = req.body;
     const logs = [
@@ -256,13 +256,13 @@ const createSale = async (req, res) => {
     const saleIndex = lastSale?.saleIndex + 1 || 1;
     const sale = await SaleModel.create({ ...req.body, saleIndex, logs });
     if (!sale) return res.status(400).send({ message: "sale not recorded" });
-    console.log("sale generated");
+   
     const updatedProducts = await updateProducts(
       summary,
       sale._id,
       salesPerson
     );
-    console.log("updated productssss", updatedProducts);
+  
     if (updatedProducts === 0 || updatedProducts === undefined) {
       return res.status(400).send({
         message:
@@ -401,7 +401,7 @@ const editSale = async (req, res) => {
     if (paymentMethod === "receipt") {
       currentReceipt = await ReceiptModel.findOne({ sale_id: _id });
     }
-    console.log("start here 1");
+
     const difference = [];
     if (
       bankDetails?.bankName &&
@@ -593,7 +593,7 @@ const editSale = async (req, res) => {
       receiptDate,
       bankTransactionReference,
     };
-    console.log("reach here 1");
+
     const sale = await SaleModel.findByIdAndUpdate(
       req.body._id,
       { ...params },
@@ -603,7 +603,7 @@ const editSale = async (req, res) => {
       return res.status(200).send("No changes made to the sale");
     if (!sale && difference?.length > 0)
       return res.status(400).send("Error! could not update sale");
-    console.log("reach here 2");
+ 
     if (sale.paymentMethod === "invoice") {
       const invoice = await InvoiceModel.findOne({ sale_id: sale._id });
       const updatedInvoice = await InvoiceModel.findByIdAndUpdate(
@@ -632,7 +632,7 @@ const editSale = async (req, res) => {
       }
       return res.status(200).send(updatedInvoice);
     }
-    console.log("reach here 3");
+  
     const updatedReceipt = await ReceiptModel.findOneAndUpdate(
       { sale_id: _id },
       {
@@ -706,7 +706,7 @@ const addComment = async (req, res) => {
         return res.status(400).send(" invoice modified but failed to update");
       return res.status(200).send(updateIvoiceLog);
     }
-    console.log("currentReceipt", currentReceipt);
+   
     const updateReceiptLog = await ReceiptModel.findByIdAndUpdate(
       currentReceipt._id,
       { $push: { logs: log } },
