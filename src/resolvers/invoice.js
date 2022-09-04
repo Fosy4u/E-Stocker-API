@@ -126,13 +126,21 @@ const getInvoiceByParam = async (req, res) => {
     const organisationId = req.query.organisationId;
     if (!organisationId)
       return res.status(400).send("organisationId is required");
-    const invoice = await InvoiceModel.find({ ...param })
+    const invoices = await InvoiceModel.find({ ...param })
       .where("status")
       .equals("active")
       .lean();
-    if (!invoice)
+    if (!invoices)
       return res.status(400).send("invoice with matching param not found");
-    return res.status(200).send(invoice);
+    const invoicesWithBalance = await checkAmountPaid(invoices);
+    let addedCustomerDetails = [];
+    await Promise.all(
+      invoicesWithBalance.map(async (invoice) => {
+        const addCustomer = await addCustomerDetail(invoice);
+        addedCustomerDetails.push(addCustomer);
+      })
+    );
+    return res.status(200).send(addedCustomerDetails);
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -185,18 +193,28 @@ const getCustomerInvoice = async (req, res) => {
     if (!organisationId)
       return res.status(400).send("organisationId is required");
     if (!customerId) return res.status(400).send("customerId is required");
-    const invoice = await InvoiceModel.find({
+    const invoices = await InvoiceModel.find({
       customerId,
       organisationId,
       stage: { $eq: "sent" },
       status: { $eq: "active" },
     }).lean();
-    if (!invoice) return res.status(200).send([]);
-    if (!outstanding) return res.status(200).send(invoice);
+    if (!invoices) return res.status(200).send([]);
+
+    const invoicesWithBalance = await checkAmountPaid(invoices);
+    let addedCustomerDetails = [];
+    await Promise.all(
+      invoicesWithBalance.map(async (invoice) => {
+        const addCustomer = await addCustomerDetail(invoice);
+        addedCustomerDetails.push(addCustomer);
+      })
+    );
+
+    if (!outstanding) return res.status(200).send(addedCustomerDetails);
 
     let collection = [];
     await Promise.all(
-      invoice.map(async (invoice) => {
+      addedCustomerDetails.map(async (invoice) => {
         const newInvoice = { ...invoice };
         const { linkedReceiptList, _id, amountDue } = newInvoice;
         let amountPaid = 0;

@@ -185,7 +185,7 @@ const getAllOrganisationContacts = async (req, res) => {
 const calcTotalSales = (allSales) => {
   let total = 0;
   allSales.forEach((sale) => {
-    total += Number(sale.subTotal);
+    total += Number(sale.amountPaid);
   });
   return total;
 };
