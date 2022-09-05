@@ -340,7 +340,7 @@ const getAllOrganisationContacts = async (req, res) => {
 const calcTotalSales = (allSales) => {
   let total = 0;
   allSales.forEach((sale) => {
-    total += Number(sale.amountPaid);
+    total += Number(sale.amountPaid || sale.amountDue);
   });
   return total;
 };
@@ -378,6 +378,7 @@ const getOrganisationCustomerRanking = async (req, res) => {
           (filter.length * 100) / allSales.length || 0;
 
         const customerSales = calcTotalSales(filter);
+
         obj.revenue = customerSales;
         obj.revenuePercentage =
           Number(customerSales * 100) / Number(calcAllSales);
