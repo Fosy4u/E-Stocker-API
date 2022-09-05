@@ -144,6 +144,7 @@ let routes = (app) => {
 
   router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
   router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
+  router.get("/invoice/logs", authMiddleware, invoiceResolver.getInvoiceLogs);
   router.get(
     "/invoice/param",
     authMiddleware,
@@ -175,6 +176,7 @@ let routes = (app) => {
 
   router.get("/receipts", authMiddleware, receiptResolver.getAllReceipt);
   router.get("/receipt", authMiddleware, receiptResolver.getReceipt);
+  router.get("/receipt/logs", authMiddleware, receiptResolver.getReceiptLogs);
   router.get(
     "/receipt/param",
     authMiddleware,

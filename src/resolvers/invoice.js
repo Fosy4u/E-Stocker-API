@@ -2,6 +2,7 @@ const InvoiceModel = require("../models/invoice");
 const SaleModel = require("../models/sales");
 const ReceiptModel = require("../models/receipt");
 const OrganisationContactModel = require("../models/organisationContact");
+const OrganisationUserModel = require("../models/organisationUsers");
 
 const calcAmountPaid = async (linkedReceiptList, _id) => {
   let amountpaid = 0;
@@ -141,6 +142,42 @@ const getInvoiceByParam = async (req, res) => {
       })
     );
     return res.status(200).send(addedCustomerDetails);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
+
+const getInvoiceLogs = async (req, res) => {
+  try {
+    const { _id } = req.query;
+    if (!_id)
+      return res.status(400).send({ message: "contact_id is required" });
+    const invoice = await InvoiceModel.findById({ _id })
+      .select("logs")
+      .lean();
+    const logs = invoice?.logs;
+
+    if (!logs || logs?.length === 0) return res.status(200).send([]);
+    const clonedLogs = [];
+    const myPromise = logs.map(async (item) => {
+      const newItem = { ...item };
+      const { userId } = newItem;
+      if (userId) {
+        const user = await OrganisationUserModel.findById({
+          _id: userId,
+        }).lean();
+        if (user) {
+          newItem.user = user;
+        }
+      }
+      clonedLogs.push(newItem);
+    });
+    await Promise.all(myPromise);
+    return res.status(200).send(
+      clonedLogs.sort(function (a, b) {
+        return new Date(b?.date) - new Date(a?.date);
+      })
+    );
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -364,4 +401,5 @@ module.exports = {
   stampInvoice,
   getCustomerInvoice,
   getInvoiceReceipts,
+  getInvoiceLogs,
 };
