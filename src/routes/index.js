@@ -287,6 +287,11 @@ let routes = (app) => {
     authMiddleware,
     organisationContactResolver.getOrganisationCustomerRanking
   );
+  router.get(
+    "/organisationContact/CustomerStatement",
+    authMiddleware,
+    organisationContactResolver.getCustomerStatement
+  );
   router.put(
     "/organisationContact/editContact",
     authMiddleware,

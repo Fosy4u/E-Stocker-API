@@ -1,4 +1,6 @@
+const ReceiptModel = require("../models/receipt");
 const OrganisationContactModel = require("../models/organisationContact");
+const InvoiceModel = require("../models/invoice");
 const SaleModel = require("../models/sales");
 const OrganisationUserModel = require("../models/organisationUsers");
 
@@ -401,6 +403,100 @@ const getOrganisationCustomerRanking = async (req, res) => {
     return res.status(500).send(error.message);
   }
 };
+const addOpenCloseBalance = (trans) => {
+  let balance = 0;
+  let collection = [];
+  trans.map((item, index) => {
+    const newItem = { ...item };
+    const { amountDue, amountOwed, amountPaid } = newItem;
+    if (index === 0) {
+      newItem.openingBalance = 0.0;
+      const newSum =
+        Number(balance) +
+        Number(amountDue) +
+        Number(amountOwed || 0) -
+        Number(amountPaid || 0);
+      newItem.closingBalance = newSum.toFixed(2);
+      collection.push(newItem);
+      balance = Number(newSum);
+    } else {
+      newItem.openingBalance = balance.toFixed(2);
+      const newBalance =
+        Number(balance) -
+        Number(amountPaid || 0) +
+        Number(newItem?.balance || 0) +
+        Number(amountDue || 0) +
+        Number(amountOwed || 0);
+      console.log("NB", newBalance);
+      newItem.closingBalance = newBalance.toFixed(2);
+      collection.push(newItem);
+      balance = newBalance;
+    }
+  });
+  return collection;
+};
+
+const calcOverPaymentAmount = (linkedInvoiceList, amountPaid) => {
+  let overPaymentAmount = 0;
+  let sum = 0;
+  if (linkedInvoiceList?.length === 0) {
+    return overPaymentAmount;
+  }
+  linkedInvoiceList?.map((invoice) => {
+    sum += Number(invoice.appliedAmount);
+  });
+  overPaymentAmount = amountPaid - sum;
+  if (overPaymentAmount === 0) {
+    overPaymentAmount = 0;
+  }
+  return overPaymentAmount;
+};
+
+const getCustomerStatement = async (req, res) => {
+  try {
+    const { _id } = req.query;
+    if (!_id) return res.status(400).send("customerId is required");
+    const combine = [];
+    const invoices = await InvoiceModel.find({
+      customerId: _id,
+      stage: "sent",
+    }).lean();
+
+    if (invoices?.length > 0) {
+      combine.push(...invoices);
+    }
+    const receipts = await ReceiptModel.find({ customerId: _id }).lean();
+    if (receipts?.length > 0) {
+      combine.push(...receipts);
+    }
+    const addSaleDate = [];
+    const myPromise = combine.map((sale) => {
+      const newSale = { ...sale };
+      newSale.date = newSale.invoiceDate || newSale.receiptDate;
+      if (newSale?.receiptNo && !newSale.isInvoicePayment) {
+        newSale.amountOwed = newSale.totalSellingPrice;
+      }
+      if (newSale?.receiptNo && newSale.isInvoicePayment) {
+        newSale.overPayment = calcOverPaymentAmount(
+          newSale?.linkedInvoiceList,
+          newSale?.amountPaid
+        );
+      }
+      addSaleDate.push(newSale);
+    });
+    await Promise.all(myPromise);
+    const sortTransactions = addSaleDate.sort(function (a, b) {
+      return new Date(a?.date) - new Date(b?.date);
+    });
+    const addBalances = await Promise.all(
+      addOpenCloseBalance(sortTransactions)
+    );
+
+    res.status(200).send(addBalances);
+  } catch (error) {
+    return res.status(500).send(error.message);
+  }
+};
 
 const editOrganisationContact = async (req, res) => {
   try {
@@ -521,4 +617,5 @@ module.exports = {
   getOrganisationContactRemark,
   deleteOrganisationContactRemark,
   getOrganisationContactLogs,
+  getCustomerStatement,
 };
