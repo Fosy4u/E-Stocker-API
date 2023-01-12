@@ -8,7 +8,7 @@ const dbUrl = require('../appSecrets.json')
 // };
 const config = {
   url: dbUrl.MONGODB_URI,
-  database: "fosyTech",
+  database: "Data1",
   imgBucket: "pictures",
 };
 module.exports = config

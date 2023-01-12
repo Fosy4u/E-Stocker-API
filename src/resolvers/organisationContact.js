@@ -1,30 +1,16 @@
 const ReceiptModel = require("../models/receipt");
 const OrganisationContactModel = require("../models/organisationContact");
-const InvoiceModel = require("../models/invoice");
-const SaleModel = require("../models/sales");
+//const SaleModel = require("../models/sales");
 const OrganisationUserModel = require("../models/organisationUsers");
 
 const createOrganisationContact = async (req, res) => {
-  const { email, organisationId } = req.body;
+  const { organisationId } = req.body;
   try {
-    if (!email) return res.status(400).send({ message: "email is required" });
     if (!organisationId)
       return res.status(400).send({ message: "organisationId is required" });
-    console.log("email", email);
-    const contact = await OrganisationContactModel.findOne({
-      email,
-      organisationId,
-    });
-    console.log("contact", contact);
-    if (contact) {
-      return res
-        .status(400)
-        .send("oops! A contact with same email address is already existing.");
-    }
 
     const params = {
       ...req.body,
-      isAdmin: true,
     };
     const createContact = new OrganisationContactModel({ ...params });
     const newContact = await createContact.save();
@@ -238,66 +224,6 @@ const calcAmountPaid = async (linkedReceiptList, _id) => {
   return amountpaid;
 };
 
-const getOutstandingDebt = async (customerId, organisationId) => {
-  let outstandingDebt = 0;
-  const invoice = await InvoiceModel.find({
-    customerId,
-    organisationId,
-    stage: { $eq: "sent" },
-    status: { $eq: "active" },
-  }).lean();
-  if (!invoice) return outstandingDebt;
-
-  let collection = [];
-  await Promise.all(
-    invoice.map(async (invoice) => {
-      const newInvoice = { ...invoice };
-      const { linkedReceiptList, _id, amountDue } = newInvoice;
-      let amountPaid = 0;
-      if (linkedReceiptList?.length > 0) {
-        amountPaid = await calcAmountPaid(linkedReceiptList, _id);
-      }
-      newInvoice.amountPaid = Number(amountPaid);
-      newInvoice.balance = Number(Number(amountDue) - Number(amountPaid));
-      if (newInvoice.balance > 0) {
-        collection.push(newInvoice);
-      }
-    })
-  );
-
-  return res.status(200).send(collection);
-};
-
-const addOutandingDebt = async (customers) => {
-  return customers.reduce(async (acc, curr) => {
-    let result = await acc;
-    const newCustomer = { ...curr };
-    const customerId = newCustomer?._id;
-    const invoice = await InvoiceModel.find({
-      customerId,
-      organisationId,
-      stage: { $eq: "sent" },
-      status: { $eq: "active" },
-    }).lean();
-    let collection = [];
-    await Promise.all(
-      invoice.map(async (invoice) => {
-        const newInvoice = { ...invoice };
-        const { linkedReceiptList, _id, amountDue } = newInvoice;
-        let amountPaid = 0;
-        if (linkedReceiptList?.length > 0) {
-          amountPaid = await calcAmountPaid(linkedReceiptList, _id);
-        }
-        newInvoice.amountPaid = Number(amountPaid);
-        newInvoice.balance = Number(Number(amountDue) - Number(amountPaid));
-        if (newInvoice.balance > 0) {
-          collection.push(newInvoice);
-        }
-      })
-    );
-  }, []);
-};
-
 const getAllOrganisationContacts = async (req, res) => {
   try {
     const { organisationId, contactType, status, outstandingDebt } = req.query;
@@ -318,7 +244,7 @@ const getAllOrganisationContacts = async (req, res) => {
         status,
       });
 
-      return res.status(200).send(contacts);
+      return res.status(200).send({ data: contacts });
     }
 
     if (contactType && !status) {
@@ -347,61 +273,56 @@ const calcTotalSales = (allSales) => {
   return total;
 };
 const getOrganisationCustomerRanking = async (req, res) => {
-  try {
-    const { organisationId, contactType } = req.query;
-    if (!organisationId)
-      return res.status(400).send({ message: "organisationId is required" });
-    if (!contactType)
-      return res.status(400).send({ message: "contact Type is required" });
-    let ranks = [];
-    if (contactType === "customer") {
-      const contacts = await OrganisationContactModel.find({
-        organisationId,
-        status: "active",
-        contactType,
-      }).lean();
-
-      const allSales = await SaleModel.find({
-        organisationId,
-        status: "active",
-      }).lean();
-
-      let customers = [];
-      const calcAllSales = calcTotalSales(allSales);
-      console.log("allS", calcAllSales);
-      const myPromise = contacts.map((customer) => {
-        let obj = { customerId: customer?._id };
-        const filter = allSales.filter(
-          (sale) => sale.customerId === customer._id.toString()
-        );
-
-        obj.sale = filter;
-        obj.saleFrequencyPercentage =
-          (filter.length * 100) / allSales.length || 0;
-
-        const customerSales = calcTotalSales(filter);
-
-        obj.revenue = customerSales;
-        obj.revenuePercentage =
-          Number(customerSales * 100) / Number(calcAllSales);
-        obj.valuation =
-          Number(obj.saleFrequencyPercentage) + Number(obj.revenuePercentage);
-        customers.push(obj);
-        obj.generalValuePercentage = Number(obj.valuation * 100) / Number(200);
-      });
-      await Promise.all(myPromise);
-      if (customers.length === 0) {
-        return res.status(200).send(customers);
-      }
-      return res.status(200).send(
-        customers.sort(function (a, b) {
-          return b.valuation - a.valuation;
-        })
-      );
-    }
-  } catch (error) {
-    return res.status(500).send(error.message);
-  }
+  //   try {
+  //     const { organisationId, contactType } = req.query;
+  //     if (!organisationId)
+  //       return res.status(400).send({ message: "organisationId is required" });
+  //     if (!contactType)
+  //       return res.status(400).send({ message: "contact Type is required" });
+  //     let ranks = [];
+  //     if (contactType === "customer") {
+  //       const contacts = await OrganisationContactModel.find({
+  //         organisationId,
+  //         status: "active",
+  //         contactType,
+  //       }).lean();
+  //       const allSales = await SaleModel.find({
+  //         organisationId,
+  //         status: "active",
+  //       }).lean();
+  //       let customers = [];
+  //       const calcAllSales = calcTotalSales(allSales);
+  //       console.log("allS", calcAllSales);
+  //       const myPromise = contacts.map((customer) => {
+  //         let obj = { customerId: customer?._id };
+  //         const filter = allSales.filter(
+  //           (sale) => sale.customerId === customer._id.toString()
+  //         );
+  //         obj.sale = filter;
+  //         obj.saleFrequencyPercentage =
+  //           (filter.length * 100) / allSales.length || 0;
+  //         const customerSales = calcTotalSales(filter);
+  //         obj.revenue = customerSales;
+  //         obj.revenuePercentage =
+  //           Number(customerSales * 100) / Number(calcAllSales);
+  //         obj.valuation =
+  //           Number(obj.saleFrequencyPercentage) + Number(obj.revenuePercentage);
+  //         customers.push(obj);
+  //         obj.generalValuePercentage = Number(obj.valuation * 100) / Number(200);
+  //       });
+  //       await Promise.all(myPromise);
+  //       if (customers.length === 0) {
+  //         return res.status(200).send(customers);
+  //       }
+  //       return res.status(200).send(
+  //         customers.sort(function (a, b) {
+  //           return b.valuation - a.valuation;
+  //         })
+  //       );
+  //     }
+  //   } catch (error) {
+  //     return res.status(500).send(error.message);
+  //   }
 };
 const addOpenCloseBalance = (trans) => {
   let balance = 0;
@@ -457,14 +378,7 @@ const getCustomerStatement = async (req, res) => {
     const { _id } = req.query;
     if (!_id) return res.status(400).send("customerId is required");
     const combine = [];
-    const invoices = await InvoiceModel.find({
-      customerId: _id,
-      stage: "sent",
-    }).lean();
 
-    if (invoices?.length > 0) {
-      combine.push(...invoices);
-    }
     const receipts = await ReceiptModel.find({ customerId: _id }).lean();
     if (receipts?.length > 0) {
       combine.push(...receipts);

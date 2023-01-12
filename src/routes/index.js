@@ -1,23 +1,16 @@
 const express = require("express");
 const router = express.Router();
 const homeResolver = require("../resolvers/home");
-const uploadController = require("../resolvers/upload");
-const pictureController = require("../resolvers/uploadImages");
-const productsResolver = require("../resolvers/product");
-const deletedProductsResolver = require("../resolvers/deletedProducts");
-const cartResolver = require("../resolvers/cart");
-const saleResolver = require("../resolvers/sales");
-const invoiceResolver = require("../resolvers/invoice");
-const receiptResolver = require("../resolvers/receipt");
 const organisationUsersResolver = require("../resolvers/organisationUsers");
 const organisationProfileResolver = require("../resolvers/organisationProfile");
-const organisationContactResolver = require("../resolvers/organisationContact");
 const OrganisationBranchResolver = require("../resolvers/organisationBranch");
-const autoGeneratorResolver = require("../resolvers/autoGenerator");
-const tagsResolver = require("../resolvers/tags");
-const firbaseResolver = require("../resolvers/firebaseImageUpload");
 const uploadImage = require("../middleware/uploadImage");
 const authMiddleware = require("../middleware/firebaseUserAuth");
+const organisationContactResolver = require("../resolvers/organisationContact");
+const truckResolver = require("../resolvers/trucks");
+const driverResolver = require("../resolvers/driver");
+const organisationpartnerResolver = require("../resolvers/organisationPartner");
+const jobRequestResolver = require("../resolvers/jobRequest");
 
 let routes = (app) => {
   router.get("/", homeResolver.getHome);
@@ -81,180 +74,143 @@ let routes = (app) => {
 
   router.get("/user", organisationUsersResolver.getOrganisationUser);
 
-  router.get("/products", authMiddleware, productsResolver.getProducts);
-  router.get("/product", authMiddleware, productsResolver.getOneProduct);
-  router.get("/gallery", authMiddleware, productsResolver.getGallery);
-  router.post(
-    "/product/create",
+  //Trucks
+
+  router.post("/truck/create", uploadImage, truckResolver.createTruck);
+  router.get("/trucks", authMiddleware, truckResolver.getTrucks);
+  router.get("/truck", authMiddleware, truckResolver.getTruck);
+  router.get("/truck/param", authMiddleware, truckResolver.getTruckByParam);
+  router.get("/trucks/partner", authMiddleware, truckResolver.getPartnerTrucks);
+  router.put(
+    "/truck/edit",
     authMiddleware,
     uploadImage,
-    productsResolver.createProduct
+    truckResolver.editTruck
   );
-  router.post(
-    "/product/createBulkProduct",
+  router.put("/truck/delete", authMiddleware, truckResolver.deleteTruck);
+  router.put("/truck/restore", authMiddleware, truckResolver.restoreTruck);
+  router.put(
+    "/truck/assignTruckDriver",
     authMiddleware,
-    productsResolver.createBulkProduct
-  );
-  router.delete(
-    "/product/deleteProduct",
-    authMiddleware,
-    productsResolver.deleteProduct
+    truckResolver.assignTruckDriver
   );
   router.put(
-    "/product/editProduct",
+    "/truck/assignTruckPartner",
+    authMiddleware,
+    truckResolver.assignPartnerTruck
+  );
+  router.put(
+    "/truck/removeTruckPartner",
+    authMiddleware,
+    truckResolver.removePartnerTruck
+  );
+  router.put("/truck/activate", authMiddleware, truckResolver.activateTruck);
+  router.put(
+    "/truck/uploadTruckDoc",
     authMiddleware,
     uploadImage,
-    productsResolver.editProduct
+    truckResolver.uploadTruckDoc
   );
+
+  //Driver
+  router.post("/driver/create", uploadImage, driverResolver.createDriver);
+  router.get("/drivers", authMiddleware, driverResolver.getDrivers);
+  router.get("/driver", authMiddleware, driverResolver.getDriver);
+  router.get("/driver/param", authMiddleware, driverResolver.getDriverByParam);
   router.put(
-    "/product/cloneProduct",
+    "/driver/edit",
     authMiddleware,
     uploadImage,
-    productsResolver.cloneProduct
+    driverResolver.editDriver
   );
-  router.get(
-    "/product/download/template",
-    authMiddleware,
-    productsResolver.downloadProductTemplate
-  );
-
-  router.get(
-    "/deletedProducts",
-    authMiddleware,
-    deletedProductsResolver.getProducts
-  );
-
-  router.get("/cart", authMiddleware, cartResolver.getCart);
-  router.post("/cart/create", authMiddleware, cartResolver.createCart);
-  router.delete("/cart/delete", authMiddleware, cartResolver.deleteCart);
-
-  router.get("/sales", authMiddleware, saleResolver.getAllSales);
-  router.get("/sale", authMiddleware, saleResolver.getSale);
-  router.get(
-    "/sales/deleted",
-    authMiddleware,
-    saleResolver.getAllDeletedInvoiceAndReceipt
-  );
-  router.post("/sale/create", authMiddleware, saleResolver.createSale);
-  router.put("/sale/delete", authMiddleware, saleResolver.deleteSale);
-  router.put("/sale/restore", authMiddleware, saleResolver.restoreSale);
-  router.put("/sale/edit", authMiddleware, saleResolver.editSale);
-  router.put("/sale/addComment", authMiddleware, saleResolver.addComment);
-  router.put("/sale/deleteComment", authMiddleware, saleResolver.deleteComment);
-
-  router.get("/invoices", authMiddleware, invoiceResolver.getAllInvoice);
-  router.get("/invoice", authMiddleware, invoiceResolver.getInvoice);
-  router.get("/invoice/logs", authMiddleware, invoiceResolver.getInvoiceLogs);
-  router.get(
-    "/invoice/param",
-    authMiddleware,
-    invoiceResolver.getInvoiceByParam
-  );
-  router.get(
-    "/invoice/customer",
-    authMiddleware,
-    invoiceResolver.getCustomerInvoice
-  );
-  router.get(
-    "/invoice/receipt",
-    authMiddleware,
-    invoiceResolver.getInvoiceReceipts
-  );
-  router.post("/invoice/create", authMiddleware, invoiceResolver.createInvoice);
-  router.delete(
-    "/invoice/delete",
-    authMiddleware,
-    invoiceResolver.deleteInvoice
-  );
-  router.put("/invoice/edit", authMiddleware, invoiceResolver.editInvoice);
-  router.put("/invoice/stamp", authMiddleware, invoiceResolver.stampInvoice);
+  router.put("/driver/activate", authMiddleware, driverResolver.activateDriver);
+  router.put("/driver/delete", authMiddleware, driverResolver.deleteDriver);
+  router.put("/driver/restore", authMiddleware, driverResolver.restoreDriver);
   router.put(
-    "/invoice/validate/invoiceno",
+    "/driver/uploadDriverDoc",
     authMiddleware,
-    invoiceResolver.validateInvoiceNo
+    uploadImage,
+    driverResolver.uploadDriverDoc
   );
 
-  router.get("/receipts", authMiddleware, receiptResolver.getAllReceipt);
-  router.get("/receipt", authMiddleware, receiptResolver.getReceipt);
-  router.get("/receipt/logs", authMiddleware, receiptResolver.getReceiptLogs);
-  router.get(
-    "/receipt/param",
+  //jobRequest
+  router.post("/jobRequest/create", jobRequestResolver.createJobRequest);
+  router.get("/jobRequests", authMiddleware, jobRequestResolver.getJobRequests);
+  router.get("/jobRequest", authMiddleware, jobRequestResolver.getJobRequest);
+  router.put(
+    "/jobRequest/edit",
     authMiddleware,
-    receiptResolver.getReceiptByParam
-  );
-  router.get(
-    "/receipt/customer/overpayment",
-    authMiddleware,
-    receiptResolver.getAllCustomerOverPayment
-  );
-  router.get(
-    "/receipt/linkedInvoices",
-    authMiddleware,
-    receiptResolver.getReceiptLinkedInvoices
+    jobRequestResolver.editJobRequest
   );
   router.put(
-    "/receipt/validate/receiptno",
+    "/jobRequest/deleteRestore",
     authMiddleware,
-    receiptResolver.validateReceiptNo
+    jobRequestResolver.deleteAndRestoreJobRequest
   );
+
+  //OrganisationPartner
   router.post(
-    "/receipt/create/invoiceLinkedPayment",
+    "/organisationPartner/create",
     authMiddleware,
-    receiptResolver.createInvoiceLinkedPayment
+    uploadImage,
+    organisationpartnerResolver.createOrganisationPartner
   );
-  router.put(
-    "/receipt/edit/invoiceLinkedPayment",
-    authMiddleware,
-    receiptResolver.editInvoiceLinkedPayment
-  );
-  router.put(
-    "/receipt/update/invoiceLinkedPayment",
-    authMiddleware,
-    receiptResolver.updateInvoiceLinkedReceipt
-  );
-
   router.get(
-    "/autogenerator/invoice",
+    "/organisationPartners",
     authMiddleware,
-    autoGeneratorResolver.getNewInvoiceNo
+    organisationpartnerResolver.getAllOrganisationPartners
   );
-
   router.get(
-    "/autogenerator/currentconfig",
+    "/organisationPartner",
     authMiddleware,
-    autoGeneratorResolver.getCurrentConfig
+    organisationpartnerResolver.getOrganisationPartner
   );
-  router.put(
-    "/autogenerator/updateconfig",
-    authMiddleware,
-    autoGeneratorResolver.updateAutoGenerator
-  );
-  router.put(
-    "/autogenerator/setDefaultInvoicePolicy",
-    authMiddleware,
-    autoGeneratorResolver.setDefaultInvoicePolicy
-  );
-  router.put(
-    "/autogenerator/deleteInvoicePolicy",
-    authMiddleware,
-    autoGeneratorResolver.deleteInvoicePolicy
-  );
-  router.put(
-    "/autogenerator/updateInvoicePolicy",
-    authMiddleware,
-    autoGeneratorResolver.updateInvoicePolicy
-  );
-
-  router.get("/tags", authMiddleware, tagsResolver.getTags);
-  router.post("/tags/create", authMiddleware, tagsResolver.createProductTag);
-  router.delete("/tags/delete", authMiddleware, tagsResolver.deleteTag);
-
   router.get(
-    "/products/template",
+    "/organisationPartner/validate",
     authMiddleware,
-    uploadController.getProductTemplate
+    organisationpartnerResolver.validateOrganisationPartner
   );
-  router.get("/download", authMiddleware, uploadController.download);
+  router.get(
+    "/organisationPartner/remarks",
+    authMiddleware,
+    organisationpartnerResolver.getOrganisationPartnerRemarks
+  );
+  router.get(
+    "/organisationPartner/logs",
+    authMiddleware,
+    organisationpartnerResolver.getOrganisationPartnerLogs
+  );
+  router.put(
+    "/organisationPartner/edit",
+    authMiddleware,
+    uploadImage,
+    organisationpartnerResolver.editOrganisationPartner
+  );
+  router.put(
+    "/organisationPartner/delete",
+    authMiddleware,
+    organisationpartnerResolver.deleteOrganisationPartner
+  );
+  router.put(
+    "/organisationPartner/restore",
+    authMiddleware,
+    organisationpartnerResolver.restoreOrganisationPartner
+  );
+  router.put(
+    "/organisationPartner/addRemark",
+    authMiddleware,
+    organisationpartnerResolver.addOrganisationPartnerRemark
+  );
+  router.put(
+    "/organisationPartner/deleteRemark",
+    authMiddleware,
+    organisationpartnerResolver.deleteOrganisationPartnerRemark
+  );
+  router.put(
+    "/organisationPartner/editRemark",
+    authMiddleware,
+    organisationpartnerResolver.editOrganisationPartnerRemark
+  );
 
   //OrganisationContact
   router.post(

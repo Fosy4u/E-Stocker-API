@@ -20,11 +20,11 @@
 const firebaseAdmin = require('firebase-admin');
 
 // change the path of json file
-const serviceAccount = require('../../e-stocker-firebase-adminsdk-zm0id-caf6fee4ec.json');
+const serviceAccount = require('../../e-log-735d8-firebase-adminsdk-v0792-0694527eb4.json');
 
 const firebase = firebaseAdmin.initializeApp({
     credential: firebaseAdmin.credential.cert(serviceAccount),
 });
-const storageRef = firebase.storage().bucket(`gs://e-stocker.appspot.com`);
+const storageRef = firebase.storage().bucket(`gs://e-log-735d8.appspot.com`);
 module.exports={storageRef, firebase}
 

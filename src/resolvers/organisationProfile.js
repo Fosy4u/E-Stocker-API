@@ -1,6 +1,6 @@
 const OrganisationProfileModel = require("../models/organisationProfile");
 const OrganisationUserModel = require("../models/organisationUsers");
-const AutoGeneratorModel = require("../models/autoGenerator");
+
 
 const { storageRef } = require("../config/firebase"); // reference to our db
 const root = require("../../root");
@@ -15,7 +15,7 @@ const addImage = async (req, filename) => {
     const source = path.join(root + "/uploads/" + filename);
     console.log("receiving file");
     await sharp(source)
-      .resize(1024, 1024)
+      // .resize(1024, 1024)
       .jpeg({ quality: 90 })
       .toFile(path.resolve(req.file.destination, "resized", filename));
     const storage = await storageRef.upload(
@@ -42,9 +42,9 @@ const getOrganisationProfile = async (req, res) => {
 
     const organisation = await OrganisationProfileModel.findOne(params);
 
-    if (!organisation) return res.status(200).send({});
+    if (!organisation) return res.status(200).send({data : {}});
 
-    return res.status(200).send(organisation);
+    return res.status(200).send({data : organisation});
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -61,20 +61,8 @@ const createOrganisationProfile = async (req, res) => {
         message:
           "problem with creating organisation. Contact Admin if this continues",
       });
-    const exist = await AutoGeneratorModel.findOne({
-      organisationId: newOrganisation._id,
-    });
-    if (!exist) {
-      const autoGenerator = new AutoGeneratorModel({
-        organisationId: newOrganisation._id,
-      });
-      await autoGenerator.save();
-      if (!autoGenerator)
-        return res.status(400).send({
-          message:
-            "problem with creating organisation autoGenerator contents. Contact Admin if this continues",
-        });
-    }
+
+ 
 
     const params = {
       firstName,
@@ -96,7 +84,7 @@ const createOrganisationProfile = async (req, res) => {
     }
 
     console.log("new user successful", newUser);
-    return res.status(200).send([newOrganisation, newUser]);
+    return res.status(200).send({data : [newOrganisation, newUser]});
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -222,7 +210,7 @@ const getBankDetails = async (req, res) => {
     // if (!bankDetails)
     //   return res.status(400).send({ message: "no bank " });
     console.log("update", bankDetails);
-    return res.status(200).send(bankDetails);
+    return res.status(200).send({data : bankDetails});
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -249,7 +237,7 @@ const deleteBankDetails = async (req, res) => {
     if (!deleteBankDetails)
       return res.status(400).send("couldnt delete bank detail");
 
-    return res.status(200).send(deleteBankDetails);
+    return res.status(200).send({data : deleteBankDetails});
   } catch (error) {
     return res.status(500).send(error.message);
   }
@@ -316,7 +304,7 @@ const updateBankDetails = async (req, res) => {
     console.log("reched here");
     const result = await updateBank(organisationId, bankDetails, res);
 
-    return res.status(200).send(result);
+    return res.status(200).send({data : result});
   } catch (error) {
     return res.status(500).send(error.message);
   }

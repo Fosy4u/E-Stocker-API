@@ -9,11 +9,12 @@ const SocialSchema = new mongoose.Schema({
   website: String,
 });
 
-const OrganisationContactSchema = new mongoose.Schema({
+const OrganisationPartnerSchema = new mongoose.Schema({
   organisationId: { type: String, required: true },
-  contactType: { type: String, required: true },
+  type: { type: String, required: true },
   salutation: { type: String, required: false },
-  status: { type: String, default: "active" },
+  disabled: { type: Boolean, default: false },
+  portalStatus: { type: Boolean, default: false },
   firstName: { type: String, required: false },
   lastName: { type: String, required: false },
   gender: { type: String, required: false },
@@ -30,11 +31,12 @@ const OrganisationContactSchema = new mongoose.Schema({
     required: false,
   },
   localGovernmentArea: { type: String, required: false },
-  createdBy: { type: String, required: true },
-  type: { type: String, required: false },
-  customerGroups: { type: [String], required: false },
-  enableCustomerPortal: { type: Boolean, default: false },
+  enablePartnerPortal: { type: Boolean, default: false },
   social: SocialSchema,
+  imageUrl: {
+    link: { type: String, required: false },
+    name: { type: String, required: false },
+  },
   logs: [
     {
       date: Date,
@@ -45,17 +47,16 @@ const OrganisationContactSchema = new mongoose.Schema({
       comment: String,
       difference: [{ _id: false, field: String, old: String, new: String }],
       reason: String,
-      customerPortal: { type: Boolean, default: false },
     },
   ],
 });
 
-OrganisationContactSchema.plugin(timestamp);
+OrganisationPartnerSchema.plugin(timestamp);
 
-const OrganisationContactModel = mongoose.model(
-  "organisationContact",
-  OrganisationContactSchema,
-  "organisationContact"
+const OrganisationPartnerModel = mongoose.model(
+  "organisationPartner",
+  OrganisationPartnerSchema,
+  "organisationPartner"
 );
 
-module.exports = OrganisationContactModel;
+module.exports = OrganisationPartnerModel;

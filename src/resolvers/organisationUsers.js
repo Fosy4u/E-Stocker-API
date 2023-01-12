@@ -22,7 +22,7 @@ const createOrganisationUsers = async (req, res) => {
     const newUser = createUser.save();
     if (newUser) {
       console.log("new user successful", newUser);
-      return res.status(200).send(newUser);
+      return res.status(200).send({data : newUser});
     }
   } catch (error) {
     return res.status(500).send(error.message);
@@ -30,9 +30,10 @@ const createOrganisationUsers = async (req, res) => {
 };
 const getOrganisationUser = async (req, res) => {
   try {
+   
     const { userId } = req.query;
     const user = await OrganisationUserModel.findOne({ userId });
-    return res.status(200).send(user);
+    return res.status(200).send({data : user});
   } catch (error) {
     return res.status(500).send(error.message);
   }
